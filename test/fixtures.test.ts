@@ -1,8 +1,12 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { readRecordings } from '../src/ai/classifier.ts';
+import { buildRequest } from '../src/ai/prompt.ts';
 import { buildApp } from '../src/app.ts';
 import { migrate } from '../src/db/migrate.ts';
 import { demoScript, loadFixture } from '../src/fixtures.ts';
 import { signatureHeader } from '../src/gateway/signature.ts';
+import { adapters } from '../src/leads/adapters.ts';
+import { normalizeLead } from '../src/leads/normalize.ts';
 import { processLead } from '../src/leads/process.ts';
 import { drain } from '../src/queue/worker.ts';
 import { createTestDatabase, silentLog, testGatewayConfig, type TestDatabase } from './helpers.ts';
@@ -79,5 +83,23 @@ describe('the Juniper Lane Realty demo script', () => {
     const merges = await query(`select detail from contact_events where kind = 'merged'`);
     expect(merges).toHaveLength(1);
     expect(merges[0].detail.absorbed_name).toBe('Dan B');
+  });
+});
+
+describe('recorded AI answers', () => {
+  it('every demo lead has a real recorded answer for the current prompt, with its tokens', () => {
+    const file = readRecordings();
+    const fixtures = new Set<string>();
+    for (const step of demoScript()) {
+      if (step.fixture.startsWith('broken')) continue;
+      const lead = normalizeLead((adapters as any)[step.source](JSON.parse(loadFixture(step.source as any, step.fixture).body)));
+      const r = file.recordings[buildRequest(file.model, { source: step.source, message: lead.message, listingRef: lead.listingRef }).key];
+      expect(r, `no recording for ${step.fixture}: run npm run ai:record`).toBeDefined();
+      expect(r.fixture).toBe(step.fixture);
+      expect(r.input_tokens).toBeGreaterThan(0);
+      fixtures.add(step.fixture);
+    }
+    expect(fixtures.size).toBe(11);
+    expect(JSON.stringify(file)).not.toMatch(/sk-ant/);
   });
 });

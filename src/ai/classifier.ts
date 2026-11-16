@@ -57,7 +57,7 @@ export class AnthropicClassifier implements Classifier {
     return {
       text: text || null,
       stopReason: response.stop_reason ?? 'unknown',
-      model: response.model,
+      model: this.model, // the model we asked for, which is the one config/pricing.json prices
       inputTokens: response.usage.input_tokens,
       outputTokens: response.usage.output_tokens,
     };

@@ -15,7 +15,8 @@
     "send": "node src/cli/send.ts",
     "db:migrate": "node src/cli/migrate.ts",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "ai:record": "node src/cli/record-ai.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.8.0",

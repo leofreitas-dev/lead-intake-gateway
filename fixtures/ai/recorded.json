@@ -1,0 +1,105 @@
+{
+  "about": "Real answers from Claude for the demo leads, recorded with `npm run ai:record` (one call per lead). The demo replays them: no key, no cost. Found by request key = sha256(model, system prompt, lead message).",
+  "model": "claude-haiku-5-5",
+  "recordings": {
+    "3d58a890768bdc95fcc089d8": {
+      "fixture": "lead-01",
+      "text": "{\"intent\":\"buy\",\"urgency\":\"high\",\"budget_band\":\"buy_500k_to_1m\",\"language\":\"en\",\"confidence\":0.95,\"evidence\":\"Asks to see the 3-bedroom on Maple Ave this Saturday with a budget around $650k.\"}",
+      "stop_reason": "end_turn",
+      "model": "claude-haiku-5-5",
+      "input_tokens": 1120,
+      "output_tokens": 89,
+      "recorded_at": "2026-11-16T12:57:39.978Z"
+    },
+    "e7d70cf8b04c0dc7c88fd60a": {
+      "fixture": "lead-02",
+      "text": "{\"intent\":\"buy\",\"urgency\":\"high\",\"budget_band\":\"not_stated\",\"language\":\"en\",\"confidence\":0.6,\"evidence\":\"Asks if the Maple Ave house is still available and says Saturday morning works for a viewing.\"}",
+      "stop_reason": "end_turn",
+      "model": "claude-haiku-5-5",
+      "input_tokens": 1108,
+      "output_tokens": 79,
+      "recorded_at": "2026-11-16T12:57:41.949Z"
+    },
+    "a6f67cdf53fd75009e9d7696": {
+      "fixture": "lead-03",
+      "text": "{\"intent\":\"buy\",\"urgency\":\"high\",\"budget_band\":\"buy_500k_to_1m\",\"language\":\"en\",\"confidence\":0.9,\"evidence\":\"Requests a showing for this weekend and states pre-approval up to $650,000.\"}",
+      "stop_reason": "end_turn",
+      "model": "claude-haiku-5-5",
+      "input_tokens": 1100,
+      "output_tokens": 80,
+      "recorded_at": "2026-11-16T12:57:43.323Z"
+    },
+    "5389e82d344b8b23fe97ebf5": {
+      "fixture": "lead-04",
+      "text": "{\"intent\":\"rent\",\"urgency\":\"high\",\"budget_band\":\"rent_under_3k_month\",\"language\":\"en\",\"confidence\":0.93,\"evidence\":\"Asks for condos for rent under $2,500 and says they need to move by December 1st, a near deadline.\"}",
+      "stop_reason": "end_turn",
+      "model": "claude-haiku-5-5",
+      "input_tokens": 1101,
+      "output_tokens": 87,
+      "recorded_at": "2026-11-16T12:57:45.136Z"
+    },
+    "0e718d34f5006c8629a85916": {
+      "fixture": "lead-05",
+      "text": "{\"intent\":\"spam\",\"urgency\":\"low\",\"budget_band\":\"not_stated\",\"language\":\"en\",\"confidence\":0.97,\"evidence\":\"Unsolicited SEO offer with a promotional link and 'limited offer' wording is bulk advertising, not a property inquiry.\"}",
+      "stop_reason": "end_turn",
+      "model": "claude-haiku-5-5",
+      "input_tokens": 1107,
+      "output_tokens": 92,
+      "recorded_at": "2026-11-16T12:57:46.343Z"
+    },
+    "f451e887e7772545e8a2b639": {
+      "fixture": "lead-06",
+      "text": "{\"intent\":\"vendor\",\"urgency\":\"low\",\"budget_band\":\"not_stated\",\"language\":\"en\",\"confidence\":0.95,\"evidence\":\"The sender is a photography studio offering packages to shoot the agency's listings and asks to send a price sheet.\"}",
+      "stop_reason": "end_turn",
+      "model": "claude-haiku-5-5",
+      "input_tokens": 1133,
+      "output_tokens": 84,
+      "recorded_at": "2026-11-16T12:57:48.184Z"
+    },
+    "198a0611cc9f5b10814b7510": {
+      "fixture": "lead-07",
+      "text": "{\"intent\":\"rent\",\"urgency\":\"low\",\"budget_band\":\"not_stated\",\"language\":\"es\",\"confidence\":0.85,\"evidence\":\"Writer says they are interested in renting a 2-bedroom apartment near the center and asks about pets, with no date or budget given.\"}",
+      "stop_reason": "end_turn",
+      "model": "claude-haiku-5-5",
+      "input_tokens": 1120,
+      "output_tokens": 89,
+      "recorded_at": "2026-11-16T12:57:50.080Z"
+    },
+    "6ab9424ae13b45fa32529afb": {
+      "fixture": "lead-08",
+      "text": "{\"intent\":\"sell\",\"urgency\":\"low\",\"budget_band\":\"not_stated\",\"language\":\"en\",\"confidence\":0.85,\"evidence\":\"Person says they are thinking about selling their townhouse and asks what it would be worth today, with no date or deadline.\"}",
+      "stop_reason": "end_turn",
+      "model": "claude-haiku-5-5",
+      "input_tokens": 1094,
+      "output_tokens": 84,
+      "recorded_at": "2026-11-16T12:57:51.928Z"
+    },
+    "a257cd98ff804dd2df354bc6": {
+      "fixture": "lead-09",
+      "text": "{\"intent\":\"sell\",\"urgency\":\"high\",\"budget_band\":\"not_stated\",\"language\":\"en\",\"confidence\":0.9,\"evidence\":\"Person is following up about selling the townhouse and asks for a call after 5, indicating a near-term call request.\"}",
+      "stop_reason": "end_turn",
+      "model": "claude-haiku-5-5",
+      "input_tokens": 1097,
+      "output_tokens": 82,
+      "recorded_at": "2026-11-16T12:57:53.849Z"
+    },
+    "3a6a160b683898568934d0cd": {
+      "fixture": "lead-10",
+      "text": "{\"intent\":\"sell\",\"urgency\":\"medium\",\"budget_band\":\"not_stated\",\"language\":\"en\",\"confidence\":0.8,\"evidence\":\"Requested a free home valuation for 77 Oak St., which indicates an owner wanting to sell or value a property, with no date given.\"}",
+      "stop_reason": "end_turn",
+      "model": "claude-haiku-5-5",
+      "input_tokens": 1093,
+      "output_tokens": 91,
+      "recorded_at": "2026-11-16T12:57:55.872Z"
+    },
+    "2f14ad73b9327d50c9739773": {
+      "fixture": "lead-11",
+      "text": "{\"intent\":\"buy\",\"urgency\":\"medium\",\"budget_band\":\"not_stated\",\"language\":\"en\",\"confidence\":0.85,\"evidence\":\"Cash buyer looking for a studio in Midtown and asks for listings, with no date or budget amount given.\"}",
+      "stop_reason": "end_turn",
+      "model": "claude-haiku-5-5",
+      "input_tokens": 1094,
+      "output_tokens": 84,
+      "recorded_at": "2026-11-16T12:57:57.797Z"
+    }
+  }
+}
