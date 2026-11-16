@@ -13,6 +13,7 @@ describe('loadConfig', () => {
       embeddedPgPort: 54329,
       logLevel: 'info',
       logPretty: false,
+      workerConcurrency: 4,
     });
     expect(config.gateway).toMatchObject({
       signatureToleranceSec: 300,

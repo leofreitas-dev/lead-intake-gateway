@@ -15,7 +15,7 @@ describe.skipIf(process.platform === 'win32')('Ctrl+C on a running gateway', () 
     await fs.rm(dataDir, { recursive: true, force: true });
   });
 
-  it('closes the server, then the pool, then Postgres, and exits 0', async () => {
+  it('closes the server, then the worker, then the pool, then Postgres, and exits 0', async () => {
     const port = 3291;
     const child = spawn(process.execPath, ['src/main.ts'], {
       detached: true, // its own process group, like a terminal session
@@ -43,6 +43,6 @@ describe.skipIf(process.platform === 'win32')('Ctrl+C on a running gateway', () 
       .map((line) => JSON.parse(line).msg as string);
     expect(code).toBe(0);
     expect(messages).not.toContain('an idle database connection was lost');
-    expect(messages.slice(-2)).toEqual(['shutting down', 'embedded Postgres stopped']);
+    expect(messages.slice(-3)).toEqual(['shutting down', 'worker stopped', 'embedded Postgres stopped']);
   }, 60_000);
 });

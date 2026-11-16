@@ -18,6 +18,8 @@ export interface Config {
   logLevel: string;
   /** Human-friendly log lines instead of JSON. */
   logPretty: boolean;
+  /** Jobs the worker runs at the same time. */
+  workerConcurrency: number;
   gateway: GatewayConfig;
 }
 
@@ -52,6 +54,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, isTerminal = Bo
     logLevel: env.LOG_LEVEL || 'info',
     // Pretty in a terminal, JSON when piped to a file or a log tool. LOG_PRETTY overrides.
     logPretty: env.LOG_PRETTY ? env.LOG_PRETTY === '1' || env.LOG_PRETTY === 'true' : isTerminal,
+    workerConcurrency: toPositiveInt(env.WORKER_CONCURRENCY, 4, 'WORKER_CONCURRENCY'),
     gateway: loadGatewayConfig(env),
   };
 }

@@ -3,7 +3,9 @@ import { loadConfig } from './config.ts';
 import { openDatabase } from './db/database.ts';
 import { migrate } from './db/migrate.ts';
 import { loadDotEnv } from './env.ts';
+import { processLead } from './leads/process.ts';
 import { createLogger } from './logger.ts';
+import { startWorker } from './queue/worker.ts';
 
 loadDotEnv();
 const config = loadConfig();
@@ -18,9 +20,11 @@ if (config.gateway.usingDemoSecrets) {
 }
 const app = buildApp({ pool: db.pool, log, gateway: config.gateway });
 await app.listen({ port: config.port, host: config.host });
+const worker = startWorker({ pool: db.pool, log, kind: 'process', handler: processLead, concurrency: config.workerConcurrency });
 log.info(`ready: http://${config.host === '0.0.0.0' ? 'localhost' : config.host}:${config.port}/ready`);
 
-// Stop taking requests, let the ones in flight finish, then close the database.
+// Stop taking requests and let the ones in flight finish; let the worker finish
+// the jobs it holds; then close the connection pool; Postgres goes last.
 let stopping = false;
 async function shutdown(signal: string) {
   if (stopping) return;
@@ -28,6 +32,7 @@ async function shutdown(signal: string) {
   log.info({ signal }, 'shutting down');
   try {
     await app.close();
+    await worker.stop();
     await db.close();
     process.exit(0);
   } catch (err) {
