@@ -14,7 +14,7 @@ First public version of Lead Intake Gateway.
 ## Measured
 
 - Chaos run (`npm run chaos`, 3 runs): 297 leads and 41 resends, the CRM down for 60 s, then 429, then 500, and a worker killed with `kill -9`. 0 lost, 0 duplicated in the CRM, 0 in the dead-letter. Reports in `reports/`.
-- Bench (`npm run bench`, median of 3 runs on one laptop): p95 28.9 ms at 200 requests/s, at most 396 requests/s, 0 lost.
+- Bench (`npm run bench`, median of 3 runs on one desktop PC): p95 28.9 ms at 200 requests/s, at most 396 requests/s, 0 lost.
 - AI cost in the demo: about US$ 0.26 per 1,000 leads (Claude Haiku 5.5).
 
 ## Try it

@@ -94,7 +94,7 @@ Command: `npm run chaos` (seed 1, commit `b9e3481`). Reports: [run 1](reports/ch
 | Most requests/s accepted | 396 |
 | Lost | 0 in every run (28,286 accepted requests in total, each checked against the database) |
 
-Command: `npm run bench` (commit `8b94d70`; AMD Ryzen 5 5500, 12 logical CPUs, WSL2, client on the same machine). Reports: [run 1](reports/bench-20261116T150910.md), [run 2](reports/bench-20261116T150949.md), [run 3](reports/bench-20261116T151029.md), [all runs](reports/bench-runs.md), including 3 runs with HTTP and workers in separate processes (`--layout split`). These are numbers for one laptop, not a production claim.
+Command: `npm run bench` (commit `8b94d70`; AMD Ryzen 5 5500, 12 logical CPUs, WSL2, client on the same machine). Reports: [run 1](reports/bench-20261116T150910.md), [run 2](reports/bench-20261116T150949.md), [run 3](reports/bench-20261116T151029.md), [all runs](reports/bench-runs.md), including 3 runs with HTTP and workers in separate processes (`--layout split`). These are numbers for one desktop PC, not a production claim.
 
 ## Cost
 
@@ -197,7 +197,7 @@ test/             Vitest
 - Nothing is ever sent: an approved reply is written to `outbox/`.
 - The demo replays recorded AI answers. A new message typed in goes to manual review unless `AI_MODE=live`.
 - The only CRM adapter included is the fake one.
-- It runs on one machine, with Postgres as the queue. The numbers above come from one laptop, not from production.
+- It runs on one machine, with Postgres as the queue. The numbers above come from one desktop PC, not from production.
 - The console listens on 127.0.0.1 with a bearer token. It is a local demo, not a hosted product.
 
 ## About
