@@ -2,6 +2,18 @@ import type { Gate } from '../queue/worker.ts';
 
 export type BreakerState = 'closed' | 'open' | 'half_open';
 
+export interface BreakerSnapshot {
+  destination: string;
+  state: BreakerState;
+  failuresInARow: number;
+  threshold: number;
+  /** While open: how long until the trial delivery. */
+  reopensInMs: number;
+  lastSuccessAt: string | null;
+  lastFailureAt: string | null;
+  lastFailure: string | null;
+}
+
 export interface BreakerChange {
   destination: string;
   from: BreakerState;
@@ -86,13 +98,35 @@ export class CircuitBreaker implements Gate {
     if (this.state === 'half_open') this.trialInFlight = false;
   }
 
+  /** For the panel: the state, and when the destination last answered well or badly. */
+  snapshot(): BreakerSnapshot {
+    const reopensInMs = this.state === 'open' ? Math.max(0, this.openedAt + this.cooldownMs - this.now()) : 0;
+    return {
+      destination: this.destination,
+      state: this.state,
+      failuresInARow: this.failures,
+      threshold: this.failureThreshold,
+      reopensInMs,
+      lastSuccessAt: this.lastSuccessAt ? new Date(this.lastSuccessAt).toISOString() : null,
+      lastFailureAt: this.lastFailureAt ? new Date(this.lastFailureAt).toISOString() : null,
+      lastFailure: this.lastFailure,
+    };
+  }
+
+  private lastSuccessAt = 0;
+  private lastFailureAt = 0;
+  private lastFailure: string | null = null;
+
   success(): void {
+    this.lastSuccessAt = this.now();
     this.failures = 0;
     this.trialInFlight = false;
     if (this.state !== 'closed') this.move('closed', 'a delivery worked');
   }
 
   failure(reason: string): void {
+    this.lastFailureAt = this.now();
+    this.lastFailure = reason;
     this.failures++;
     if (this.state === 'half_open') {
       this.trialInFlight = false;

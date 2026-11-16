@@ -28,7 +28,7 @@ describe('loadConfig', () => {
       url: 'http://127.0.0.1:4010', timeoutMs: 3000, rateLimitPerSec: 5, rateLimitBurst: 5, maxAttempts: 10,
       backoffBaseMs: 1000, backoffMaxMs: 600000, breakerThreshold: 5, breakerCooldownMs: 15000, concurrency: 4, leaseMs: 30000,
     });
-    expect(config.admin).toEqual({ token: 'demo-only-admin-token', usingDemoToken: true });
+    expect(config.admin).toEqual({ token: 'demo-only-admin-token', usingDemoToken: true, outboxDir: path.resolve('outbox') });
   });
 
   it('runs HTTP and workers by default; ROLE=worker runs only the workers', () => {

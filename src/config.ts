@@ -60,9 +60,11 @@ export interface CrmConfig {
 }
 
 export interface AdminConfig {
-  /** Bearer token for the admin endpoints (GET /dead-letter, POST /replay). */
+  /** Bearer token for the admin endpoints and the approval screen. */
   token: string;
   usingDemoToken: boolean;
+  /** Where approved replies are written. Nothing is ever sent. */
+  outboxDir: string;
 }
 
 /** Published on purpose so the local demo works; refused with NODE_ENV=production. */
@@ -138,13 +140,14 @@ function toRole(value: string | undefined): Config['role'] {
 }
 
 function loadAdminConfig(env: NodeJS.ProcessEnv): AdminConfig {
+  const outboxDir = path.resolve(env.OUTBOX_DIR || 'outbox');
   const token = env.ADMIN_TOKEN;
   if (token) {
     if (token.length < 16) throw new Error('ADMIN_TOKEN must be at least 16 characters');
-    return { token, usingDemoToken: false };
+    return { token, usingDemoToken: false, outboxDir };
   }
   if (env.NODE_ENV === 'production') throw new Error('ADMIN_TOKEN is required when NODE_ENV=production');
-  return { token: DEMO_ADMIN_TOKEN, usingDemoToken: true };
+  return { token: DEMO_ADMIN_TOKEN, usingDemoToken: true, outboxDir };
 }
 
 function loadAiConfig(env: NodeJS.ProcessEnv): AiConfig {

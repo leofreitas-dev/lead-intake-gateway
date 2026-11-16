@@ -11,7 +11,7 @@ describe('admin endpoints: GET /dead-letter and POST /replay', () => {
   beforeAll(async () => {
     db = await createTestDatabase();
     await migrate(db.pool);
-    app = buildApp({ pool: db.pool, log: silentLog, gateway: testGatewayConfig(), admin: { token: TOKEN, usingDemoToken: false } });
+    app = buildApp({ pool: db.pool, log: silentLog, gateway: testGatewayConfig(), admin: { token: TOKEN, usingDemoToken: false, outboxDir: 'outbox' } });
   });
   afterAll(async () => {
     await app.close();
