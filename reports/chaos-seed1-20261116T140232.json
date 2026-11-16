@@ -1,0 +1,150 @@
+{
+  "command": "npm run chaos",
+  "seed": 1,
+  "commit": "b9e3481",
+  "ran_at": "2026-11-16T14:02:32.627Z",
+  "machine": "12 CPUs, linux 6.18.58.1-microsoft-standard-WSL2, Node v24.22.2",
+  "settings": {
+    "AI_MODE": "recorded",
+    "LOG_PRETTY": "0",
+    "LOG_LEVEL": "info",
+    "DELIVERY_LEASE_MS": "10000",
+    "CRM_RATE_LIMIT_PER_SEC": "4",
+    "CRM_RATE_LIMIT_BURST": "4",
+    "RATE_LIMIT_PER_SEC": "500",
+    "RATE_LIMIT_BURST": "1000",
+    "CRM_DOWN_SEC": 60,
+    "CRM_429_SEC": 15,
+    "CRM_500_SEC": 15
+  },
+  "plan": {
+    "webhooks": 338,
+    "leads": 297,
+    "resends": 41,
+    "contacts": 140,
+    "contacts_for_crm": 132
+  },
+  "sent": {
+    "http_requests": 338,
+    "accepted_unique": 297,
+    "recognised_as_duplicate": 41,
+    "resends_given_another_id": 0,
+    "gave_up": 0
+  },
+  "stored": {
+    "inbox": 297,
+    "leads": 297,
+    "contacts": 140
+  },
+  "crm": {
+    "active_records": 132,
+    "records": 132,
+    "calls": 337,
+    "calls_by_status": {
+      "200": 169,
+      "201": 130,
+      "429": 14,
+      "500": 2,
+      "dropped": 22
+    }
+  },
+  "lost": {
+    "total": 0,
+    "accepted_but_not_stored": 0,
+    "leads_missing": 0,
+    "contacts_missing_from_crm": 0
+  },
+  "duplicated": {
+    "total": 0,
+    "extra_crm_records": 0,
+    "records_mixing_two_contacts": 0,
+    "records_matching_no_contact": 0,
+    "spam_in_crm": 0
+  },
+  "out_of_date_in_crm": 0,
+  "dead_letter": 0,
+  "retries": {
+    "process": 0,
+    "classify": 0,
+    "deliver_crm": 40
+  },
+  "jobs": [
+    {
+      "kind": "classify",
+      "status": "done",
+      "n": 297,
+      "retries": 0
+    },
+    {
+      "kind": "deliver_crm",
+      "status": "done",
+      "n": 289,
+      "retries": 40
+    },
+    {
+      "kind": "process",
+      "status": "done",
+      "n": 297,
+      "retries": 0
+    }
+  ],
+  "circuit_breaker_opened": 11,
+  "kill": {
+    "job": "271",
+    "crm_calls_for_it_before_kill": 1,
+    "final_status": "done",
+    "final_attempts": 2,
+    "crm_records_for_it": 1
+  },
+  "seconds": {
+    "burst_to_drained": 135.773,
+    "crm_back_to_drained": 41.539
+  },
+  "timeline": [
+    {
+      "at": 2.8,
+      "what": "started: fake CRM (pid 115245), gateway (pid 115261), worker-1 (pid 115262)"
+    },
+    {
+      "at": 2.8,
+      "what": "burst: sending 338 webhooks, 16 at a time"
+    },
+    {
+      "at": 4.2,
+      "what": "burst sent: 338 HTTP requests in 1.4 s"
+    },
+    {
+      "at": 5.9,
+      "what": "CRM down (drops every connection) for 60 s"
+    },
+    {
+      "at": 65.9,
+      "what": "CRM answers 429 (rate limited) for 15 s"
+    },
+    {
+      "at": 80.9,
+      "what": "CRM answers 500 for 15 s"
+    },
+    {
+      "at": 95.9,
+      "what": "CRM slow (saves, answers after 5 s): waiting for worker-1 to hold a delivery"
+    },
+    {
+      "at": 97.1,
+      "what": "kill -9 worker-1 (pid 115262) while it held delivery job #271"
+    },
+    {
+      "at": 97.1,
+      "what": "CRM ok again"
+    },
+    {
+      "at": 97.1,
+      "what": "worker-2 started (pid 115568)"
+    },
+    {
+      "at": 138.6,
+      "what": "queue drained: no job pending or running"
+    }
+  ],
+  "verdict": "PASS"
+}
