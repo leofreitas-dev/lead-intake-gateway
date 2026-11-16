@@ -82,7 +82,7 @@ describe.skipIf(process.platform === 'win32')('Ctrl+C on a running gateway', () 
     }
 
     const msgs = messages();
-    expect(msgs).not.toContain('an idle database connection was lost');
+    expect(msgs, output).not.toContain('an idle database connection was lost');
     // The workers (process, classify, deliver) stop at the same time, so their
     // lines can come in any order; what matters is what happens before and after.
     const shuttingDown = msgs.indexOf('shutting down');

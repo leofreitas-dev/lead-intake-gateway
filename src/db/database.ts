@@ -24,7 +24,7 @@ export async function openDatabase(
   if (config.databaseUrl) {
     const pool = createPool(config.databaseUrl, log);
     log.info({ database: describeUrl(config.databaseUrl) }, 'using the Postgres from DATABASE_URL');
-    return { pool, embedded: false, close: () => pool.end() };
+    return { pool, embedded: false, close: () => endPool(pool) };
   }
 
   const server = await startEmbeddedPostgres({
@@ -38,10 +38,34 @@ export async function openDatabase(
     pool,
     embedded: true,
     close: async () => {
-      await pool.end();
+      await endPool(pool);
       await server.stop();
     },
   };
+}
+
+/**
+ * Closes every connection of the pool and waits until each one is really
+ * closed. pool.end() alone resolves as soon as the connections are taken off
+ * its list, while each one is still saying goodbye to Postgres; stopping
+ * Postgres right then cut those goodbyes short ("terminating connection due to
+ * administrator command" on an idle connection).
+ */
+export async function endPool(pool: pg.Pool, timeoutMs = 5_000): Promise<void> {
+  const open = pool.totalCount;
+  let closed = 0;
+  let timer: NodeJS.Timeout | undefined;
+  const allClosed = new Promise<void>((resolve) => {
+    if (open === 0) return resolve();
+    pool.on('remove', () => {
+      if (++closed >= open) resolve();
+    });
+    timer = setTimeout(resolve, timeoutMs);
+    timer.unref();
+  });
+  await pool.end();
+  await allClosed;
+  clearTimeout(timer);
 }
 
 export function createPool(connectionString: string, log: Logger): pg.Pool {
