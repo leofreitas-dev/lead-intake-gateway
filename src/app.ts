@@ -7,6 +7,7 @@ import { adminRoutes } from './admin/routes.ts';
 import type { AdminConfig, GatewayConfig } from './config.ts';
 import { webhookRoutes } from './gateway/routes.ts';
 import type { Logger } from './logger.ts';
+import { Metrics, METRICS_CONTENT_TYPE } from './observability/metrics.ts';
 
 export interface AppDeps {
   pool: pg.Pool;
@@ -18,6 +19,8 @@ export interface AppDeps {
   crmStatus?: () => CrmStatus;
   /** Clock for signature and rate-limit checks. Injected in tests. */
   now?: () => number;
+  /** Also export Node's own process metrics (CPU, memory, event loop) on /metrics. Off in tests. */
+  processMetrics?: boolean;
 }
 
 const TRACE_HEADER = 'x-request-id';
@@ -26,7 +29,8 @@ const SAFE_TRACE_ID = /^[A-Za-z0-9._:-]{1,100}$/;
 
 export type App = ReturnType<typeof buildApp>;
 
-export function buildApp({ pool, log, gateway, admin, crmStatus, now }: AppDeps) {
+export function buildApp({ pool, log, gateway, admin, crmStatus, now, processMetrics = false }: AppDeps) {
+  const metrics = new Metrics({ pool, crmStatus, processMetrics });
   const app = Fastify({
     loggerInstance: log,
     // Keep the caller's trace id if it sends a sane one, so one id follows the
@@ -58,7 +62,11 @@ export function buildApp({ pool, log, gateway, admin, crmStatus, now }: AppDeps)
     }
   });
 
-  app.register(webhookRoutes, { pool, config: gateway, now });
+  // Prometheus scrapes this. Counts only, no personal data. Not behind the admin
+  // token, like most /metrics endpoints: the server listens on 127.0.0.1 by default.
+  app.get('/metrics', async (_request, reply) => reply.type(METRICS_CONTENT_TYPE).send(await metrics.render()));
+
+  app.register(webhookRoutes, { pool, config: gateway, now, metrics });
   if (admin) {
     app.register(adminRoutes, { pool, admin, crmStatus });
     // The approval screen. The page itself holds no data: it asks for the admin

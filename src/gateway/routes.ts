@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type pg from 'pg';
 import type { GatewayConfig } from '../config.ts';
+import type { Metrics } from '../observability/metrics.ts';
 import { isSource, type Source } from '../sources.ts';
 import { idempotencyKey } from './idempotency.ts';
 import { checkBody, storeWebhook } from './inbox.ts';
@@ -12,7 +13,12 @@ export interface GatewayDeps {
   config: GatewayConfig;
   /** Injected in tests to control time. */
   now?: () => number;
+  /** Counts each answer (by channel and outcome) and how long it took. */
+  metrics?: Metrics;
 }
+
+// Which answers were a recognised resend, for the metrics.
+const duplicates = new WeakSet<FastifyRequest>();
 
 type WebhookRequest = FastifyRequest<{ Params: { source: string }; Body: string }>;
 
@@ -44,6 +50,16 @@ export async function webhookRoutes(app: FastifyInstance, deps: GatewayDeps): Pr
   app.addContentTypeParser('application/json', { parseAs: 'string', bodyLimit: config.bodyLimitBytes }, (_req, body, done) =>
     done(null, body),
   );
+
+  // Every answer is counted, the refusals too (401, 413, 429...): elapsedTime
+  // runs from the first byte of the request to the last byte of the answer.
+  if (deps.metrics) {
+    const metrics = deps.metrics;
+    app.addHook('onResponse', async (request, reply) => {
+      const { source } = request.params as { source?: string };
+      metrics.observeWebhook(source ?? 'unknown', reply.statusCode, duplicates.has(request), reply.elapsedTime / 1000);
+    });
+  }
 
   app.post<{ Params: { source: string }; Body: string }>(
     '/webhooks/:source',
@@ -104,6 +120,7 @@ export async function webhookRoutes(app: FastifyInstance, deps: GatewayDeps): Pr
         request.log.warn({ ...fields, parse_error: stored.parseError }, 'webhook stored but not processable');
         return reply.code(400).send({ error: 'invalid_payload', message: stored.parseError, id: stored.inboxId, trace_id: stored.traceId });
       }
+      if (stored.duplicate) duplicates.add(request);
       request.log.info(fields, stored.duplicate ? 'duplicate webhook: already stored' : 'webhook stored and queued');
       return reply.code(202).send({ id: stored.inboxId, trace_id: stored.traceId, duplicate: stored.duplicate });
     },
