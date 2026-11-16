@@ -284,7 +284,7 @@ CRM calls ${r.settings.CRM_RATE_LIMIT_PER_SEC}/s (the fake CRM takes 200/s here)
 - Latency is measured by the client, for accepted requests. At steady load it counts from when each request was **due**, so time spent
   waiting behind a slow answer is included (no "coordinated omission"). At maximum load, requests queue on purpose: its p95 shows
   queueing, not the gateway at rest.
-- Server side, the gateway counted ${r.server_side.accepted_counted} accepted webhooks (warm-up included), ${r.server_side.mean_ms} ms on average
+- Server side, the gateway counted ${r.server_side.accepted_counted} accepted webhooks over all three phases (warm-up, steady, maximum), ${r.server_side.mean_ms} ms on average
   (\`lig_webhook_duration_seconds\` on /metrics).
 - **Lost: ${r.lost}.** Every \`202\` was checked against the database.
 - Jobs still queued when the bench ended (the workers catch up afterwards): ${r.backlog_when_measured.map((b: { kind: string; n: number }) => `${b.kind} ${b.n}`).join(', ') || 'none'}.
