@@ -23,6 +23,20 @@ describe('loadConfig', () => {
       usingDemoSecrets: true,
     });
     expect(config.gateway.secrets.form).toBe('demo-only-secret-form');
+    expect(config.ai).toEqual({ mode: 'recorded', model: 'claude-haiku-5-5', minConfidence: 0.7 });
+  });
+
+  it('uses the recorded AI answers unless AI_MODE=live, and live needs a key', () => {
+    expect(loadConfig({ ANTHROPIC_API_KEY: 'x' }, false).ai.mode).toBe('recorded');
+    expect(loadConfig({ AI_MODE: 'live', ANTHROPIC_API_KEY: 'x' }, false).ai.mode).toBe('live');
+    expect(() => loadConfig({ AI_MODE: 'live' }, false)).toThrow(/needs ANTHROPIC_API_KEY/);
+    expect(() => loadConfig({ AI_MODE: 'yes' }, false)).toThrow(/AI_MODE/);
+    expect(() => loadConfig({ AI_MIN_CONFIDENCE: '70' }, false)).toThrow(/AI_MIN_CONFIDENCE/);
+  });
+
+  it('never keeps the API key in the config', () => {
+    const config = loadConfig({ AI_MODE: 'live', ANTHROPIC_API_KEY: 'sk-ant-should-not-appear' }, false);
+    expect(JSON.stringify(config)).not.toContain('should-not-appear');
   });
 
   it('uses the webhook secrets from the environment', () => {

@@ -21,6 +21,18 @@ export interface Config {
   /** Jobs the worker runs at the same time. */
   workerConcurrency: number;
   gateway: GatewayConfig;
+  ai: AiConfig;
+}
+
+export interface AiConfig {
+  /**
+   * recorded (default): replays real answers saved in fixtures/ai/recorded.json; no key, no cost.
+   * live: calls the Anthropic API with ANTHROPIC_API_KEY.
+   */
+  mode: 'live' | 'recorded';
+  model: string;
+  /** Below this confidence a person reviews the lead. */
+  minConfidence: number;
 }
 
 export interface GatewayConfig {
@@ -56,7 +68,18 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, isTerminal = Bo
     logPretty: env.LOG_PRETTY ? env.LOG_PRETTY === '1' || env.LOG_PRETTY === 'true' : isTerminal,
     workerConcurrency: toPositiveInt(env.WORKER_CONCURRENCY, 4, 'WORKER_CONCURRENCY'),
     gateway: loadGatewayConfig(env),
+    ai: loadAiConfig(env),
   };
+}
+
+function loadAiConfig(env: NodeJS.ProcessEnv): AiConfig {
+  const mode = env.AI_MODE || 'recorded';
+  if (mode !== 'live' && mode !== 'recorded') throw new Error(`AI_MODE must be "live" or "recorded", got "${mode}"`);
+  // Only checks that the key is there; the value is read by the Anthropic SDK and never stored or logged here.
+  if (mode === 'live' && !env.ANTHROPIC_API_KEY) throw new Error('AI_MODE=live needs ANTHROPIC_API_KEY in .env');
+  const minConfidence = env.AI_MIN_CONFIDENCE ? Number(env.AI_MIN_CONFIDENCE) : 0.7;
+  if (!(minConfidence >= 0 && minConfidence <= 1)) throw new Error(`AI_MIN_CONFIDENCE must be between 0 and 1, got "${env.AI_MIN_CONFIDENCE}"`);
+  return { mode, model: env.AI_MODEL || 'claude-haiku-5-5', minConfidence };
 }
 
 function loadGatewayConfig(env: NodeJS.ProcessEnv): GatewayConfig {
