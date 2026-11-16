@@ -65,7 +65,7 @@ describe('POST /webhooks/:source', () => {
     await db.drop();
   });
   beforeEach(async () => {
-    await db.pool.query('truncate inbox, jobs');
+    await db.pool.query('truncate inbox, jobs cascade');
   });
 
   describe('a valid lead', () => {
