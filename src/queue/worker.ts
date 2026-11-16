@@ -212,10 +212,11 @@ async function recordFailure(
     opts.log.warn(fields, 'job failed after its lease ran out; another worker owns it now');
     return 'retry';
   }
+  const what = `${job.kind} #${job.id} attempt ${attempt} of ${maxAttempts} failed (${fields.err})`;
   if (dead) {
-    opts.log.error(fields, permanent ? 'job failed and retrying cannot help: moved to dead-letter' : 'job failed for the last time: moved to dead-letter');
+    opts.log.error(fields, permanent ? `${what}; retrying cannot help: moved to dead-letter` : `${what}; no attempts left: moved to dead-letter`);
   } else {
-    opts.log.warn({ ...fields, retry_in_ms: delay }, `job failed: retry ${attempt + 1} of ${maxAttempts} in ${formatMs(delay)}`);
+    opts.log.warn({ ...fields, retry_in_ms: delay }, `${what}; next attempt in ${formatMs(delay)}`);
   }
   return dead ? 'dead' : 'retry';
 }
