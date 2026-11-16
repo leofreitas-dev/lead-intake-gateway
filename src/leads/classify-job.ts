@@ -1,6 +1,8 @@
 import type { Classifier } from '../ai/classifier.ts';
 import { classifyLead, MIN_CONFIDENCE } from '../ai/classify.ts';
+import { wantsDraft } from '../ai/draft.ts';
 import type { PriceList } from '../ai/pricing.ts';
+import { DRAFT_JOB } from '../replies/draft-job.ts';
 import { DELIVER_JOB, NOT_DELIVERED_ROUTES } from '../delivery/deliver-job.ts';
 import type { JobHandler } from '../queue/worker.ts';
 import { decideRoute, ROUTES } from '../routing/rules.ts';
@@ -73,6 +75,14 @@ export function makeClassifyHandler({ classifier, prices, minConfidence = MIN_CO
         `insert into jobs (kind, inbox_id, payload, trace_id)
          select $2, inbox_id, jsonb_build_object('contact_id', contact_id, 'lead_id', id), trace_id from leads where id = $1`,
         [leadId, DELIVER_JOB],
+      );
+    }
+    // And, for buyers, sellers and renters, a reply draft for a person to approve.
+    if (wantsDraft(decision.route, c?.intent)) {
+      await client.query(
+        `insert into jobs (kind, inbox_id, payload, trace_id)
+         select $2, inbox_id, jsonb_build_object('lead_id', id), trace_id from leads where id = $1`,
+        [leadId, DRAFT_JOB],
       );
     }
 
