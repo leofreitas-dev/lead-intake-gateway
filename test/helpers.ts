@@ -56,3 +56,12 @@ export function testGatewayConfig(overrides: Partial<GatewayConfig> = {}): Gatew
     ...overrides,
   };
 }
+
+/** Waits until `check` is true, instead of guessing how long something takes. */
+export async function until(check: () => boolean | Promise<boolean>, timeoutMs = 10_000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (!(await check())) {
+    if (Date.now() > deadline) throw new Error(`condition not met within ${timeoutMs} ms`);
+    await new Promise((r) => setTimeout(r, 20));
+  }
+}

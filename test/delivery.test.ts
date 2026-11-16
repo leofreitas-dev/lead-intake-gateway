@@ -14,7 +14,7 @@ import { processLead } from '../src/leads/process.ts';
 import { listDeadJobs, replayDeadJobs } from '../src/queue/dead-letter.ts';
 import { drain, runOneLeasedJob } from '../src/queue/worker.ts';
 import type { Source } from '../src/sources.ts';
-import { createTestDatabase, silentLog, type TestDatabase } from './helpers.ts';
+import { createTestDatabase, silentLog, type TestDatabase, until } from './helpers.ts';
 
 describe('delivery to the CRM', () => {
   let db: TestDatabase;
@@ -45,7 +45,7 @@ describe('delivery to the CRM', () => {
     createDelivery({
       pool: db.pool,
       log: silentLog,
-      crm: new HttpCrmClient({ baseUrl: crmUrl, timeoutMs: 300 }),
+      crm: new HttpCrmClient({ baseUrl: crmUrl, timeoutMs: 3_000 }),
       maxAttempts: 10,
       backoffBaseMs: 1,
       backoffMaxMs: 5,
@@ -155,17 +155,19 @@ describe('delivery to the CRM', () => {
     const d = delivery({ breakerThreshold: 1 });
     expect(await runOneLeasedJob(d)).toBe('retry');
     expect(d.breaker.current).toBe('closed');
-    const { rows } = await db.pool.query(`select run_at > now() + interval '1.5 seconds' as waits from jobs where kind = $1`, [DELIVER_JOB]);
+    const { rows } = await db.pool.query(`select run_at - updated_at >= interval '2 seconds' as waits from jobs where kind = $1`, [DELIVER_JOB]);
     expect(rows[0].waits).toBe(true); // Retry-After: 2 s, more than the 5 ms backoff
   });
 
   it('slow CRM: it saved the contact but answered too late; the retry updates the same record', async () => {
     await leadsArrive(['whatsapp', 'lead-04']);
-    await setMode('slow', 600);
-    const d = delivery({ breakerThreshold: 100 });
+    // The CRM answers after 3 s; this client gives up after 0.3 s.
+    await setMode('slow', 3_000);
+    const d = delivery({ breakerThreshold: 100, crm: new HttpCrmClient({ baseUrl: crmUrl, timeoutMs: 300 }) });
     expect(await runOneLeasedJob(d)).toBe('retry');
+    await until(async () => (await crmState()).contactRecords === 1); // saved anyway
     await setMode('ok');
-    await new Promise((r) => setTimeout(r, 20));
+    await until(async () => (await db.pool.query(`select run_at <= now() as ready from jobs where kind = $1`, [DELIVER_JOB])).rows[0].ready);
     expect(await drain(d)).toMatchObject({ done: 1 });
     const state = await crmState();
     expect(state.contactRecords).toBe(1);

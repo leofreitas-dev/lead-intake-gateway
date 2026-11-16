@@ -6,7 +6,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { HttpCrmClient } from '../src/crm/http-crm.ts';
 import { type CrmContact, CrmError, externalIdFor } from '../src/crm/types.ts';
 import { buildFakeCrm } from '../src/fake-crm/server.ts';
-import { silentLog } from './helpers.ts';
+import { silentLog, until } from './helpers.ts';
 
 const contact = (over: Partial<CrmContact> = {}): CrmContact => ({
   externalId: 'lig_contact_0001',
@@ -41,7 +41,7 @@ describe('the fake CRM and the HTTP CRM client', () => {
     crm = buildFakeCrm({ log: silentLog, rateLimitPerSec: 1000 });
     await crm.listen({ port: 0, host: '127.0.0.1' });
     const { port } = crm.server.address() as { port: number };
-    client = new HttpCrmClient({ baseUrl: `http://127.0.0.1:${port}`, timeoutMs: 300 });
+    client = new HttpCrmClient({ baseUrl: `http://127.0.0.1:${port}`, timeoutMs: 3_000 });
   });
   afterAll(() => crm.close());
   beforeEach(async () => {
@@ -85,8 +85,12 @@ describe('the fake CRM and the HTTP CRM client', () => {
   });
 
   it('slow: the CRM saves it but answers too late → timeout; the retry updates the same record', async () => {
-    await setMode('slow', 1_000);
-    expect(await client.upsertContact(contact(), { traceId: null }).catch((e) => e)).toMatchObject({ kind: 'timeout', retryable: true });
+    // The CRM answers after 3 s; this client gives up after 0.3 s. The wide gap
+    // keeps it a timeout however busy the machine is.
+    await setMode('slow', 3_000);
+    const impatient = new HttpCrmClient({ baseUrl: `http://127.0.0.1:${(crm.server.address() as { port: number }).port}`, timeoutMs: 300 });
+    expect(await impatient.upsertContact(contact(), { traceId: null }).catch((e) => e)).toMatchObject({ kind: 'timeout', retryable: true });
+    await until(() => crm.state.contacts.lig_contact_0001 !== undefined);
     expect(crm.state.contacts.lig_contact_0001.version).toBe(1); // it was saved anyway
     await setMode('ok');
     expect(await client.upsertContact(contact(), { traceId: null })).toMatchObject({ created: false });
