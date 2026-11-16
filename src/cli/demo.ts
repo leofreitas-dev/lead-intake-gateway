@@ -8,7 +8,7 @@ import { RecordedClassifier } from '../ai/classifier.ts';
 import { loadPriceList } from '../ai/pricing.ts';
 import { buildApp } from '../app.ts';
 import { loadConfig } from '../config.ts';
-import { createPool } from '../db/database.ts';
+import { createPool, endPool } from '../db/database.ts';
 import { startEmbeddedPostgres } from '../db/embedded.ts';
 import { migrate } from '../db/migrate.ts';
 import { demoScript, loadFixture } from '../fixtures.ts';
@@ -84,7 +84,11 @@ try {
   // 2. Workers
   const prices = loadPriceList();
   const classifier = new RecordedClassifier();
-  const counts = await drain({ pool, log, kind: 'process', handler: processLead, concurrency: 4 });
+  // One loop, so leads are processed in arrival order and the story is the same
+  // every run: Dan B is a contact of his own until Daniel's portal lead links them.
+  // With several loops the final contacts are the same, but Daniel's portal lead
+  // may come first, and then Dan B is never a separate contact to merge.
+  const counts = await drain({ pool, log, kind: 'process', handler: processLead, concurrency: 1 });
   const classified = await drain({ pool, log, kind: CLASSIFY_JOB, handler: makeClassifyHandler({ classifier, prices }), concurrency: 4 });
   console.log(bold('2. Workers take jobs from the Postgres queue (FOR UPDATE SKIP LOCKED)'));
   console.log(`  → "process":  ${counts.done} jobs done, ${counts.retry} retried, ${counts.dead} dead-letter (each one queues a "classify" job)`);
@@ -192,6 +196,6 @@ try {
   console.log(dim('  That is what these answers cost when they were recorded; replaying them now costs $0.'));
   console.log(dim(`  Price: $${price.input_usd_per_mtok.toFixed(2)} input / $${price.output_usd_per_mtok.toFixed(2)} output per million tokens (config/pricing.json, checked ${prices.checkedOn}).`));
 } finally {
-  await pool.end();
+  await endPool(pool);
   await server.stop();
 }

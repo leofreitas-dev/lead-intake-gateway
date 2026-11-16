@@ -11,24 +11,55 @@ import { processLead } from '../src/leads/process.ts';
 import { drain } from '../src/queue/worker.ts';
 import { createTestDatabase, silentLog, testGatewayConfig, type TestDatabase } from './helpers.ts';
 
+/** Posts the demo webhooks (in the given order) and works the queue with one loop, in arrival order. */
+async function runDemoScript(db: TestDatabase, steps = demoScript()) {
+  const gateway = testGatewayConfig();
+  const app = buildApp({ pool: db.pool, log: silentLog, gateway });
+  for (const step of steps) {
+    const { body } = loadFixture(step.source, step.fixture);
+    await app.inject({
+      method: 'POST',
+      url: `/webhooks/${step.source}`,
+      payload: body,
+      headers: { 'content-type': 'application/json', 'x-signature': signatureHeader(gateway.secrets[step.source], body) },
+    });
+  }
+  await app.close();
+  // One loop: the story ("Dan B" known apart, then merged) depends on the order
+  // leads are processed in. With several loops, Daniel's portal lead can be
+  // processed before Dan B's WhatsApp, and then there is never a second contact
+  // to merge: the same final contacts, a different history. See the test below.
+  await drain({ pool: db.pool, log: silentLog, kind: 'process', handler: processLead, concurrency: 1 });
+}
+
+const ACTIVE_CONTACTS = `
+  select display_name, (select count(*)::int from leads l where l.contact_id = c.id) as leads
+    from contacts c where merged_into is null order by display_name, leads desc`;
+
+describe('the demo script in the opposite order', () => {
+  let db: TestDatabase;
+  beforeAll(async () => {
+    db = await createTestDatabase();
+    await migrate(db.pool);
+    await runDemoScript(db, demoScript().reverse());
+  });
+  afterAll(() => db.drop());
+
+  it('makes the same 7 contacts; Daniel was never split, so there is nothing to merge', async () => {
+    const contacts = (await db.pool.query(ACTIVE_CONTACTS)).rows;
+    expect(contacts).toHaveLength(7);
+    expect(contacts).toContainEqual({ display_name: 'Daniel Brooks', leads: 3 });
+    expect(contacts).toContainEqual({ display_name: 'Emily Carter', leads: 3 });
+    expect((await db.pool.query(`select count(*)::int as n from contact_events where kind = 'merged'`)).rows).toEqual([{ n: 0 }]);
+  });
+});
+
 describe('the Juniper Lane Realty demo script', () => {
   let db: TestDatabase;
   beforeAll(async () => {
     db = await createTestDatabase();
     await migrate(db.pool);
-    const gateway = testGatewayConfig();
-    const app = buildApp({ pool: db.pool, log: silentLog, gateway });
-    for (const step of demoScript()) {
-      const { body } = loadFixture(step.source, step.fixture);
-      await app.inject({
-        method: 'POST',
-        url: `/webhooks/${step.source}`,
-        payload: body,
-        headers: { 'content-type': 'application/json', 'x-signature': signatureHeader(gateway.secrets[step.source], body) },
-      });
-    }
-    await app.close();
-    await drain({ pool: db.pool, log: silentLog, kind: 'process', handler: processLead });
+    await runDemoScript(db);
   });
   afterAll(() => db.drop());
 
@@ -53,9 +84,7 @@ describe('the Juniper Lane Realty demo script', () => {
   });
 
   it('11 leads become 7 contacts', async () => {
-    const contacts = await query(`
-      select display_name, (select count(*)::int from leads l where l.contact_id = c.id) as leads
-        from contacts c where merged_into is null order by display_name, leads desc`);
+    const contacts = await query(ACTIVE_CONTACTS);
     expect(contacts).toEqual([
       { display_name: 'Daniel Brooks', leads: 3 },
       { display_name: 'Emily Carter', leads: 3 },
