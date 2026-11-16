@@ -64,8 +64,11 @@ export async function storeWebhook(pool: pg.Pool, webhook: IncomingWebhook): Pro
       }
       result = { inboxId, traceId: webhook.traceId, duplicate: false, parseError: webhook.parseError ?? null };
     } else {
+      // Counted, so the panel can show how many resends were caught.
       const existing = await client.query<{ id: string; trace_id: string; parse_error: string | null }>(
-        `select id, trace_id, parse_error from inbox where source = $1 and idempotency_key = $2`,
+        `update inbox set resends = resends + 1, last_resend_at = now()
+          where source = $1 and idempotency_key = $2
+          returning id, trace_id, parse_error`,
         [webhook.source, webhook.idempotency.key],
       );
       const row = existing.rows[0];

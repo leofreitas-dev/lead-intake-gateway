@@ -125,7 +125,8 @@ describe('POST /webhooks/:source', () => {
       const third = await send(app);
       expect(again.statusCode).toBe(202);
       expect(again.json()).toEqual({ id: first.id, trace_id: first.trace_id, duplicate: true });
-      expect(third.json().id).toBe(first.id);
+      expect(await counts(db)).toEqual({ inbox: 1, jobs: 1 });
+      expect((await db.pool.query('select resends from inbox')).rows[0].resends).toBe(2);
       expect(await counts(db)).toEqual({ inbox: 1, jobs: 1 });
     });
 
@@ -148,6 +149,7 @@ describe('POST /webhooks/:source', () => {
       expect(responses.map((r) => r.statusCode)).toEqual(Array(20).fill(202));
       expect(new Set(responses.map((r) => r.json().id)).size).toBe(1);
       expect(responses.filter((r) => r.json().duplicate === false)).toHaveLength(1);
+      expect((await db.pool.query('select resends from inbox')).rows[0].resends).toBe(19);
       expect(await counts(db)).toEqual({ inbox: 1, jobs: 1 });
     });
   });
