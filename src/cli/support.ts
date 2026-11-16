@@ -46,6 +46,16 @@ export function currentCommit(): string {
   return dirty ? `${commit} (with uncommitted changes)` : commit;
 }
 
+/**
+ * The p-th percentile of numbers sorted from small to large ("nearest rank"):
+ * the smallest value with at least p% of the values at or below it. p95 of
+ * 100 latencies is the 95th smallest. NaN for an empty list.
+ */
+export function percentile(sorted: number[], p: number): number {
+  if (sorted.length === 0) return NaN;
+  return sorted[Math.min(sorted.length - 1, Math.max(0, Math.ceil((p / 100) * sorted.length) - 1))];
+}
+
 /** What the numbers were measured on. */
 export function machine() {
   const cpus = os.cpus();
