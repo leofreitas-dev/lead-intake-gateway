@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type pg from 'pg';
 import type { GatewayConfig } from '../config.ts';
+import { schemas } from '../docs/schemas.ts';
 import type { Metrics } from '../observability/metrics.ts';
 import { isSource, type Source } from '../sources.ts';
 import { idempotencyKey } from './idempotency.ts';
@@ -64,6 +65,7 @@ export async function webhookRoutes(app: FastifyInstance, deps: GatewayDeps): Pr
   app.post<{ Params: { source: string }; Body: string }>(
     '/webhooks/:source',
     {
+      schema: schemas.webhook,
       onRequest: async (request, reply) => {
         const { source } = request.params;
         if (!isSource(source)) {

@@ -5,6 +5,7 @@ import type { AdminConfig } from '../config.ts';
 import { listDeadJobs, replayDeadJobs } from '../queue/dead-letter.ts';
 import { approveDraft, type Decision, rejectDraft } from '../replies/decide.ts';
 import { type CrmStatus, dashboard, listDrafts } from './dashboard.ts';
+import { schemas } from '../docs/schemas.ts';
 
 /**
  * Admin endpoints, for a person (or `npm run replay`), never for providers:
@@ -28,12 +29,12 @@ export async function adminRoutes(app: FastifyInstance, opts: { pool: pg.Pool; a
     }
   });
 
-  app.get<{ Querystring: { kind?: string } }>('/dead-letter', async (request) => {
+  app.get<{ Querystring: { kind?: string } }>('/dead-letter', { schema: schemas.deadLetter }, async (request) => {
     const jobs = await listDeadJobs(pool, { kind: request.query.kind });
     return { count: jobs.length, jobs };
   });
 
-  app.post<{ Body: { ids?: unknown; all?: unknown; kind?: unknown } }>('/replay', async (request, reply) => {
+  app.post<{ Body: { ids?: unknown; all?: unknown; kind?: unknown } }>('/replay', { schema: schemas.replay }, async (request, reply) => {
     const body = request.body ?? {};
     const ids = Array.isArray(body.ids) ? body.ids.map(String) : undefined;
     if (ids && (ids.length === 0 || !ids.every((id) => /^\d{1,18}$/.test(id)))) {
@@ -49,14 +50,14 @@ export async function adminRoutes(app: FastifyInstance, opts: { pool: pg.Pool; a
 
   // --- The approval screen's data (same token). ---
 
-  app.get<{ Querystring: { status?: string } }>('/api/drafts', async (request, reply) => {
+  app.get<{ Querystring: { status?: string } }>('/api/drafts', { schema: schemas.listDrafts }, async (request, reply) => {
     const which = request.query.status ?? 'waiting';
     if (which !== 'waiting' && which !== 'decided') return reply.code(400).send({ error: 'status must be "waiting" or "decided"' });
     const drafts = await listDrafts(pool, which);
     return { count: drafts.length, drafts };
   });
 
-  app.post<{ Params: { id: string }; Body: { body?: unknown } }>('/api/drafts/:id/approve', async (request, reply) => {
+  app.post<{ Params: { id: string }; Body: { body?: unknown } }>('/api/drafts/:id/approve', { schema: schemas.approve }, async (request, reply) => {
     const body = request.body?.body;
     if (body !== undefined && typeof body !== 'string') return reply.code(400).send({ error: 'body must be text' });
     const result = await approveDraft(pool, { id: request.params.id, body, by: 'admin', outboxDir: admin.outboxDir });
@@ -64,14 +65,14 @@ export async function adminRoutes(app: FastifyInstance, opts: { pool: pg.Pool; a
     return answer(reply, result);
   });
 
-  app.post<{ Params: { id: string }; Body: { reason?: unknown } }>('/api/drafts/:id/reject', async (request, reply) => {
+  app.post<{ Params: { id: string }; Body: { reason?: unknown } }>('/api/drafts/:id/reject', { schema: schemas.reject }, async (request, reply) => {
     const reason = typeof request.body?.reason === 'string' ? request.body.reason : undefined;
     const result = await rejectDraft(pool, { id: request.params.id, reason, by: 'admin' });
     if (result.ok) request.log.info({ draft_id: result.draftId }, 'reply rejected: it never goes out');
     return answer(reply, result);
   });
 
-  app.get('/api/dashboard', async () => dashboard(pool, opts.crmStatus?.()));
+  app.get('/api/dashboard', { schema: schemas.dashboard }, async () => dashboard(pool, opts.crmStatus?.()));
 }
 
 const STATUS_OF_ERROR = { not_found: 404, already_decided: 409, empty_reply: 400, too_long: 400 } as const;

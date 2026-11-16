@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto';
-import Fastify from 'fastify';
+import Fastify, { type FastifyInstance } from 'fastify';
+import { registerDocs } from './docs/openapi.ts';
+import { schemas } from './docs/schemas.ts';
 import type pg from 'pg';
 import type { CrmStatus } from './admin/dashboard.ts';
 import { consolePage } from './admin/page.ts';
@@ -47,12 +49,29 @@ export function buildApp({ pool, log, gateway, admin, crmStatus, now, processMet
     reply.header(TRACE_HEADER, request.id);
   });
 
+  // Route schemas are documentation (for /docs): the handlers check their own
+  // inputs, as they always did, and answers are plain JSON.stringify, so a
+  // schema can never silently drop a field from an answer.
+  app.setValidatorCompiler(() => () => true);
+  app.setSerializerCompiler(() => (data) => JSON.stringify(data));
+
+  // First the docs, then every route (as plugins, so the docs see them all).
+  registerDocs(app);
+  app.register(async (routes) => coreRoutes(routes));
+  app.register(webhookRoutes, { pool, config: gateway, now, metrics });
+  if (admin) {
+    app.register(adminRoutes, { pool, admin, crmStatus });
+    app.register(async (routes) => consoleRoute(routes, admin));
+  }
+  return app;
+
+  function coreRoutes(app: FastifyInstance) {
   // Liveness: the process is up and answering. Never touches the database,
   // so a slow database does not make an orchestrator restart a healthy process.
-  app.get('/health', async () => ({ status: 'ok', uptime_s: Math.round(process.uptime()) }));
+  app.get('/health', { schema: schemas.health }, async () => ({ status: 'ok', uptime_s: Math.round(process.uptime()) }));
 
   // Readiness: the process can do real work, which needs the database.
-  app.get('/ready', async (request, reply) => {
+  app.get('/ready', { schema: schemas.ready }, async (request, reply) => {
     try {
       await withTimeout(pool.query('select 1'), READY_TIMEOUT_MS);
       return { status: 'ready', db: 'ok' };
@@ -64,25 +83,21 @@ export function buildApp({ pool, log, gateway, admin, crmStatus, now, processMet
 
   // Prometheus scrapes this. Counts only, no personal data. Not behind the admin
   // token, like most /metrics endpoints: the server listens on 127.0.0.1 by default.
-  app.get('/metrics', async (_request, reply) => reply.type(METRICS_CONTENT_TYPE).send(await metrics.render()));
-
-  app.register(webhookRoutes, { pool, config: gateway, now, metrics });
-  if (admin) {
-    app.register(adminRoutes, { pool, admin, crmStatus });
-    // The approval screen. The page itself holds no data: it asks for the admin
-    // token and calls the /api routes above, which check it on every request.
-    app.get('/', async (_request, reply) =>
-      reply
-        .type('text/html; charset=utf-8')
-        .header('cache-control', 'no-store')
-        // Nothing from the internet: scripts, styles and requests stay on this server.
-        .header('content-security-policy', "default-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'")
-        .header('x-content-type-options', 'nosniff')
-        .send(consolePage(admin.usingDemoToken)),
-    );
+  app.get('/metrics', { schema: schemas.metrics }, async (_request, reply) => reply.type(METRICS_CONTENT_TYPE).send(await metrics.render()));
   }
+}
 
-  return app;
+/** The approval screen. The page holds no data: it asks for the admin token and calls /api, which checks it on every request. */
+function consoleRoute(app: FastifyInstance, admin: AdminConfig) {
+  app.get('/', { schema: schemas.console }, async (_request, reply) =>
+    reply
+      .type('text/html; charset=utf-8')
+      .header('cache-control', 'no-store')
+      // Nothing from the internet: scripts, styles and requests stay on this server.
+      .header('content-security-policy', "default-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'")
+      .header('x-content-type-options', 'nosniff')
+      .send(consolePage(admin.usingDemoToken)),
+  );
 }
 
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
