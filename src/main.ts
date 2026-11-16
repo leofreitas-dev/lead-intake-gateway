@@ -5,6 +5,8 @@ import { migrate } from './db/migrate.ts';
 import { loadDotEnv } from './env.ts';
 import { AnthropicClassifier, RecordedClassifier } from './ai/classifier.ts';
 import { loadPriceList } from './ai/pricing.ts';
+import { HttpCrmClient } from './crm/http-crm.ts';
+import { createDelivery } from './delivery/deliver-job.ts';
 import { CLASSIFY_JOB, makeClassifyHandler } from './leads/classify-job.ts';
 import { processLead } from './leads/process.ts';
 import { createLogger } from './logger.ts';
@@ -21,7 +23,10 @@ log.info({ applied }, applied.length ? 'database migrations applied' : 'database
 if (config.gateway.usingDemoSecrets) {
   log.warn('using the built-in DEMO webhook secrets; set WEBHOOK_SECRET_<SOURCE> before real use');
 }
-const app = buildApp({ pool: db.pool, log, gateway: config.gateway });
+if (config.admin.usingDemoToken) {
+  log.warn('using the built-in DEMO admin token for /dead-letter and /replay; set ADMIN_TOKEN before real use');
+}
+const app = buildApp({ pool: db.pool, log, gateway: config.gateway, admin: config.admin });
 await app.listen({ port: config.port, host: config.host });
 const classifier = config.ai.mode === 'live' ? new AnthropicClassifier(config.ai.model) : new RecordedClassifier();
 log.info(
@@ -32,7 +37,12 @@ const classify = makeClassifyHandler({ classifier, prices: loadPriceList(), minC
 const workers = [
   startWorker({ pool: db.pool, log, kind: 'process', handler: processLead, concurrency: config.workerConcurrency }),
   startWorker({ pool: db.pool, log, kind: CLASSIFY_JOB, handler: classify, concurrency: config.workerConcurrency }),
+  startWorker(createDelivery({ pool: db.pool, log, crm: new HttpCrmClient({ baseUrl: config.crm.url, timeoutMs: config.crm.timeoutMs }), ...config.crm })),
 ];
+log.info(
+  { crm: config.crm.url, max_attempts: config.crm.maxAttempts, rate_limit_per_sec: config.crm.rateLimitPerSec, breaker_threshold: config.crm.breakerThreshold },
+  `CRM deliveries go to ${config.crm.url} (start the fake one with: npm run crm)`,
+);
 log.info(`ready: http://${config.host === '0.0.0.0' ? 'localhost' : config.host}:${config.port}/ready`);
 
 // Stop taking requests and let the ones in flight finish; let the workers finish

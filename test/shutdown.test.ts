@@ -83,13 +83,15 @@ describe.skipIf(process.platform === 'win32')('Ctrl+C on a running gateway', () 
 
     const msgs = messages();
     expect(msgs).not.toContain('an idle database connection was lost');
-    // The two workers stop at the same time, so their lines can come in either
-    // order; what matters is what happens before and after them.
+    // The workers (process, classify, deliver) stop at the same time, so their
+    // lines can come in any order; what matters is what happens before and after.
     const shuttingDown = msgs.indexOf('shutting down');
+    const workersStarted = msgs.filter((m) => m === 'worker started').length;
     const workersStopped = msgs.flatMap((m, i) => (m === 'worker stopped' ? [i] : []));
     const postgresStopped = msgs.indexOf('embedded Postgres stopped');
     expect(shuttingDown, output).toBeGreaterThanOrEqual(0);
-    expect(workersStopped, output).toHaveLength(2);
+    expect(workersStarted).toBe(3);
+    expect(workersStopped, output).toHaveLength(workersStarted);
     expect(Math.min(...workersStopped)).toBeGreaterThan(shuttingDown);
     expect(postgresStopped).toBeGreaterThan(Math.max(...workersStopped));
     expect(postgresStopped).toBe(msgs.length - 1); // Postgres is the very last thing
