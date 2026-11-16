@@ -1,0 +1,170 @@
+{
+  "name": "Lead form → Lead Intake Gateway (signed)",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Put the gateway in front of your n8n\n\nThis workflow only **collects, signs and forwards**. It does not dedupe, classify, route or deliver to the CRM: the gateway does all of that, and stores the lead before it answers 202.\n\n1. **Contact form**: the website form (n8n's own Form Trigger).\n2. **Build the webhook body**: the gateway's `form` payload, as one exact JSON text.\n3. **Sign (HMAC-SHA256)**: `HMAC(secret, \"<t>.<body>\")`, the secret from the n8n credential *Lead gateway: form secret* (never in this file).\n4. **Send to the gateway**: `POST /webhooks/form` with `X-Signature: t=…,v1=…` and `X-Event-Id`. n8n retries a failed call; the same event id makes a retry harmless (the gateway answers with the same lead id).",
+        "height": 270,
+        "width": 640,
+        "color": 7
+      },
+      "id": "5d1f3c0e-6b0e-4d1e-9a51-1f1e00000001",
+      "name": "About this workflow",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-60, -330]
+    },
+    {
+      "parameters": {
+        "formTitle": "Contact Juniper Lane Realty",
+        "formDescription": "Tell us what you are looking for and we will get back to you. (Demo: a fictional agency; use fictional data only.)",
+        "formFields": {
+          "values": [
+            { "fieldLabel": "Name", "fieldName": "name", "fieldType": "text", "requiredField": true },
+            { "fieldLabel": "Email", "fieldName": "email", "fieldType": "email", "requiredField": true, "placeholder": "you@example.test" },
+            { "fieldLabel": "Phone", "fieldName": "phone", "fieldType": "text", "placeholder": "(212) 555-0147" },
+            { "fieldLabel": "Listing (optional)", "fieldName": "listing_id", "fieldType": "text", "placeholder": "JLR-1042" },
+            { "fieldLabel": "Message", "fieldName": "message", "fieldType": "textarea", "requiredField": true }
+          ]
+        },
+        "responseMode": "lastNode",
+        "options": {
+          "path": "juniper-contact",
+          "buttonLabel": "Send",
+          "appendAttribution": false
+        }
+      },
+      "id": "5d1f3c0e-6b0e-4d1e-9a51-1f1e00000002",
+      "name": "Contact form",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.6,
+      "position": [0, 0],
+      "webhookId": "5d1f3c0e-6b0e-4d1e-9a51-1f1e0000f001"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1",
+              "name": "body",
+              "type": "string",
+              "value": "={{ JSON.stringify({ form_id: 'n8n-contact', site: 'juniperlanerealty.example.test', submitted_at: $json.submittedAt, name: $json.name, email: $json.email, phone: $json.phone || undefined, listing_id: $json.listing_id || undefined, message: $json.message }) }}"
+            },
+            {
+              "id": "a2",
+              "name": "t",
+              "type": "number",
+              "value": "={{ Math.floor(Date.now() / 1000) }}"
+            },
+            {
+              "id": "a3",
+              "name": "event_id",
+              "type": "string",
+              "value": "=n8n-form-{{ $execution.id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "5d1f3c0e-6b0e-4d1e-9a51-1f1e00000003",
+      "name": "Build the webhook body",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [240, 0]
+    },
+    {
+      "parameters": {
+        "action": "hmac",
+        "type": "SHA256",
+        "value": "={{ $json.t }}.{{ $json.body }}",
+        "dataPropertyName": "signature",
+        "encoding": "hex"
+      },
+      "id": "5d1f3c0e-6b0e-4d1e-9a51-1f1e00000004",
+      "name": "Sign (HMAC-SHA256)",
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 2,
+      "position": [480, 0],
+      "credentials": {
+        "crypto": { "id": "ligFormSecret0001", "name": "Lead gateway: form secret" }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:3000/webhooks/form",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-Signature", "value": "=t={{ $json.t }},v1={{ $json.signature }}" },
+            { "name": "X-Event-Id", "value": "={{ $json.event_id }}" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ $json.body }}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "5d1f3c0e-6b0e-4d1e-9a51-1f1e00000005",
+      "name": "Send to the gateway",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [720, 0],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "operation": "completion",
+        "respondWith": "text",
+        "completionTitle": "=Thanks, {{ $('Contact form').item.json.name }}!",
+        "completionMessage": "=We got your message and will get back to you soon. Reference: {{ $json.id }}",
+        "options": {}
+      },
+      "id": "5d1f3c0e-6b0e-4d1e-9a51-1f1e00000006",
+      "name": "Received",
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.5,
+      "position": [980, -100],
+      "webhookId": "5d1f3c0e-6b0e-4d1e-9a51-1f1e0000f002"
+    },
+    {
+      "parameters": {
+        "operation": "completion",
+        "respondWith": "text",
+        "completionTitle": "Sorry, that did not go through",
+        "completionMessage": "We could not take your message right now. Please try again in a minute.",
+        "options": {}
+      },
+      "id": "5d1f3c0e-6b0e-4d1e-9a51-1f1e00000007",
+      "name": "Not received",
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.5,
+      "position": [980, 100],
+      "webhookId": "5d1f3c0e-6b0e-4d1e-9a51-1f1e0000f003"
+    }
+  ],
+  "connections": {
+    "Contact form": { "main": [[{ "node": "Build the webhook body", "type": "main", "index": 0 }]] },
+    "Build the webhook body": { "main": [[{ "node": "Sign (HMAC-SHA256)", "type": "main", "index": 0 }]] },
+    "Sign (HMAC-SHA256)": { "main": [[{ "node": "Send to the gateway", "type": "main", "index": 0 }]] },
+    "Send to the gateway": {
+      "main": [
+        [{ "node": "Received", "type": "main", "index": 0 }],
+        [{ "node": "Not received", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "pinData": {},
+  "meta": { "templateCredsSetupCompleted": false },
+  "active": false,
+  "id": "ligLeadForm00001",
+  "tags": []
+}
