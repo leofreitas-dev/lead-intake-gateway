@@ -1,0 +1,114 @@
+{
+  "name": "Lead Intake Gateway → tell the team a reply is waiting",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## The way back: n8n tells, a person decides\n\nEvery minute n8n asks the gateway which AI reply drafts are **waiting for a person** (`GET /api/drafts`, with the admin token from the n8n credential *Lead gateway: admin token*, never in this file).\n\nEach draft is announced **once** (n8n remembers the draft ids it has already announced), as a message for the sales team with a link to the approval console.\n\nn8n never approves, edits or sends a reply: a person does that in the gateway's console, and an approved reply only goes to the gateway's outbox.\n\nConnect the last node to your Slack, e-mail or Teams.",
+        "height": 300,
+        "width": 640,
+        "color": 7
+      },
+      "id": "7e2a4b10-1c3d-4e5f-8a90-2b2b00000001",
+      "name": "About this workflow",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-60, -360]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "minutes", "minutesInterval": 1 }]
+        }
+      },
+      "id": "7e2a4b10-1c3d-4e5f-8a90-2b2b00000002",
+      "name": "Every minute",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "url": "http://127.0.0.1:3000/api/drafts",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "7e2a4b10-1c3d-4e5f-8a90-2b2b00000003",
+      "name": "Drafts waiting (gateway)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [240, 0],
+      "credentials": {
+        "httpBearerAuth": { "id": "ligAdminToken0001", "name": "Lead gateway: admin token" }
+      }
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "drafts",
+        "options": {}
+      },
+      "id": "7e2a4b10-1c3d-4e5f-8a90-2b2b00000004",
+      "name": "One item per draft",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [480, 0]
+    },
+    {
+      "parameters": {
+        "operation": "removeItemsSeenInPreviousExecutions",
+        "dedupeValue": "={{ $json.id }}",
+        "options": {}
+      },
+      "id": "7e2a4b10-1c3d-4e5f-8a90-2b2b00000005",
+      "name": "Only drafts not announced yet",
+      "type": "n8n-nodes-base.removeDuplicates",
+      "typeVersion": 2,
+      "position": [720, 0]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b1",
+              "name": "text",
+              "type": "string",
+              "value": "=Reply waiting for approval: {{ $json.lead.name || 'a lead' }} via {{ $json.lead.source }} ({{ $json.understood.intent }}, urgency {{ $json.understood.urgency }}, route {{ $json.route.route }}). Review it at http://127.0.0.1:3000/"
+            },
+            { "id": "b2", "name": "draft_id", "type": "string", "value": "={{ $json.id }}" },
+            { "id": "b3", "name": "urgency", "type": "string", "value": "={{ $json.understood.urgency }}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "7e2a4b10-1c3d-4e5f-8a90-2b2b00000006",
+      "name": "Message for the sales team",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [960, 0]
+    },
+    {
+      "parameters": {},
+      "id": "7e2a4b10-1c3d-4e5f-8a90-2b2b00000007",
+      "name": "Send it (connect Slack, e-mail…)",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1200, 0]
+    }
+  ],
+  "connections": {
+    "Every minute": { "main": [[{ "node": "Drafts waiting (gateway)", "type": "main", "index": 0 }]] },
+    "Drafts waiting (gateway)": { "main": [[{ "node": "One item per draft", "type": "main", "index": 0 }]] },
+    "One item per draft": { "main": [[{ "node": "Only drafts not announced yet", "type": "main", "index": 0 }]] },
+    "Only drafts not announced yet": { "main": [[{ "node": "Message for the sales team", "type": "main", "index": 0 }]] },
+    "Message for the sales team": { "main": [[{ "node": "Send it (connect Slack, e-mail…)", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "pinData": {},
+  "meta": { "templateCredsSetupCompleted": false },
+  "active": false,
+  "id": "ligDraftsWaiting1",
+  "tags": []
+}
