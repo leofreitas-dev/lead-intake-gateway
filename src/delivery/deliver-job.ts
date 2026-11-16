@@ -50,13 +50,12 @@ export function createDelivery(opts: DeliveryOptions): LeasedWorkerOptions & { b
   });
   const throttle = new Throttle({ perSecond: opts.rateLimitPerSec, burst: opts.rateLimitBurst, now: opts.now });
 
-  const external: ExternalJobHandler = async (job, jobLog) => {
-    const contactId = await currentContact(pool, String(job.payload.contact_id));
-    const contact = await crmSnapshot(pool, contactId);
+  const send = async (contact: CrmContact, traceId: string | null) => {
     const waited = await throttle.acquire();
-    let result;
     try {
-      result = await crm.upsertContact(contact, { traceId: job.trace_id });
+      const result = await crm.upsertContact(contact, { traceId });
+      breaker.success();
+      return { result, waited };
     } catch (err) {
       if (err instanceof CrmError) {
         if (err.countsAgainstDestination) breaker.failure(err.message);
@@ -64,7 +63,24 @@ export function createDelivery(opts: DeliveryOptions): LeasedWorkerOptions & { b
       }
       throw err;
     }
-    breaker.success();
+  };
+
+  const external: ExternalJobHandler = async (job, jobLog) => {
+    let contactId = await currentContact(pool, String(job.payload.contact_id));
+    let contact = await crmSnapshot(pool, contactId);
+    let { result, waited } = await send(contact, job.trace_id);
+    // Each lead queues its own delivery, so two deliveries of one contact can be
+    // in flight together, and the older picture can land last. So, after the CRM
+    // took ours, look again: if the contact changed meanwhile, send it as it is
+    // now. Whichever delivery finishes last then leaves the newest picture.
+    for (let resend = 0; resend < 5; resend++) {
+      const nowId = await currentContact(pool, contactId);
+      const now = await crmSnapshot(pool, nowId);
+      if (nowId === contactId && JSON.stringify(now) === JSON.stringify(contact)) break;
+      jobLog.info({ contact_id: nowId }, 'the contact changed while it was being delivered: sending it again as it is now');
+      [contactId, contact] = [nowId, now];
+      ({ result, waited } = await send(contact, job.trace_id));
+    }
     await pool.query(
       `insert into crm_sync (destination, contact_id, external_id, crm_id, last_job_id)
        values ($1, $2, $3, $4, $5)

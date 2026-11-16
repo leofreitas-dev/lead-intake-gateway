@@ -174,6 +174,25 @@ describe('delivery to the CRM', () => {
     expect(state.contacts[0].version).toBe(2);
   });
 
+  it('the contact changes while its delivery is in flight → it is sent again as it is now', async () => {
+    await leadsArrive(['whatsapp', 'lead-04']);
+    const http = new HttpCrmClient({ baseUrl: crmUrl, timeoutMs: 3_000 });
+    const sent: string[] = [];
+    const changingMidway: CrmClient = {
+      name: 'fake-crm',
+      upsertContact: async (contact, ctx) => {
+        sent.push(contact.name ?? '');
+        // While the first call is on its way, a newer lead renames the contact
+        // (and that lead's own delivery may already have landed).
+        if (sent.length === 1) await db.pool.query(`update contacts set display_name = 'Marcus Webb'`);
+        return http.upsertContact(contact, ctx);
+      },
+    };
+    expect(await drain(delivery({ crm: changingMidway }))).toMatchObject({ done: 1 });
+    expect(sent).toEqual(['Marcus', 'Marcus Webb']);
+    expect((await crmState()).contacts[0].data.name).toBe('Marcus Webb');
+  });
+
   it('a 4xx (our data refused) goes to dead-letter at once, without burning 10 attempts', async () => {
     await leadsArrive(['whatsapp', 'lead-04']);
     const refusing: CrmClient = {
