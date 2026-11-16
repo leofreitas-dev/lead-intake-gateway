@@ -1,6 +1,7 @@
 import type { JobHandler } from '../queue/worker.ts';
 import { isSource } from '../sources.ts';
 import { adapters } from './adapters.ts';
+import { CLASSIFY_JOB } from './classify-job.ts';
 import { resolveIdentity } from './identity.ts';
 import { normalizeLead } from './normalize.ts';
 
@@ -25,6 +26,14 @@ export const processLead: JobHandler = async (client, job, log) => {
     traceId: inbox.trace_id,
     occurredAt: normalized.occurredAt ?? inbox.received_at,
   });
+
+  // Next step, in the same transaction: the lead and its classify job exist together or not at all.
+  await client.query('insert into jobs (kind, inbox_id, payload, trace_id) values ($1, $2, $3, $4)', [
+    CLASSIFY_JOB,
+    inbox.id,
+    { lead_id: result.leadId },
+    inbox.trace_id,
+  ]);
 
   log.info(
     { lead_id: result.leadId, contact_id: result.contactId, identity: result.decision.action, notes: normalized.notes },

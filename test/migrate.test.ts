@@ -15,7 +15,7 @@ describe('migrate', () => {
     const tables = await db.pool.query(
       `select table_name from information_schema.tables where table_schema = 'public' order by 1`,
     );
-    expect(tables.rows.map((r) => r.table_name)).toEqual(['contact_events', 'contact_identifiers', 'contacts', 'inbox', 'jobs', 'leads', 'schema_migrations']);
+    expect(tables.rows.map((r) => r.table_name)).toEqual(['ai_calls', 'contact_events', 'contact_identifiers', 'contacts', 'inbox', 'jobs', 'lead_classifications', 'lead_routes', 'leads', 'schema_migrations']);
   });
 
   it('does nothing the second time', async () => {
