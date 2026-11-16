@@ -79,15 +79,16 @@ export async function resolveIdentity(client: pg.PoolClient, lead: LeadToStore):
     await client.query('select pg_advisory_xact_lock(hashtextextended($1, 0))', [key]);
   }
 
-  const lookup = async (kind: IdentifierKind, value: string | null): Promise<Match | undefined> => {
-    if (!value) return undefined;
+  const found: Partial<Record<IdentifierKind, string>> = {};
+  for (const { kind, value } of identifiers) {
     const { rows } = await client.query<{ contact_id: string }>(
       'select contact_id from contact_identifiers where kind = $1 and value = $2',
       [kind, value],
     );
-    return rows[0] ? lockContact(client, rows[0].contact_id) : undefined;
-  };
-  const decision = decide(await lookup('email', lead.email), await lookup('phone', lead.phone));
+    if (rows[0]) found[kind] = rows[0].contact_id;
+  }
+  const matches = await lockContacts(client, Object.values(found));
+  const decision = decide(found.email ? matches.get(found.email) : undefined, found.phone ? matches.get(found.phone) : undefined);
 
   let contactId: string;
   let created = false;
@@ -148,18 +149,54 @@ export async function resolveIdentity(client: pg.PoolClient, lead: LeadToStore):
   return { leadId, contactId, decision };
 }
 
-/** Locks a contact row; if it was merged into another one, follows to the survivor. */
-async function lockContact(client: pg.PoolClient, contactId: string): Promise<Match> {
-  let id = contactId;
-  for (let hops = 0; hops < 20; hops++) {
-    const { rows } = await client.query<{ id: string; merged_into: string | null; created_at: Date }>(
-      'select id, merged_into, created_at from contacts where id = $1 for update',
-      [id],
+/**
+ * Locks the contacts the lead's identifiers point to, and returns, for each id
+ * given, the contact it is now (following merges to the survivor).
+ *
+ * The rows are locked in ONE statement, in id order. Two transactions that
+ * need the same contacts then always lock them in the same order, so neither
+ * can hold one while waiting for the other's (a deadlock). Locking one contact
+ * at a time, "the email's contact, then the phone's", did deadlock: A writing
+ * with B's phone while B writes with A's phone locked A,B and B,A.
+ *
+ * If a contact was merged between reading it and locking it, its survivor may
+ * come before it in id order: the savepoint rollback releases the locks just
+ * taken, and the loop locks the new set, in order, from scratch.
+ *
+ * FOR NO KEY UPDATE, not FOR UPDATE: the contact's key never changes, so a
+ * foreign-key check elsewhere (a new lead, a timeline event) is never blocked.
+ */
+async function lockContacts(client: pg.PoolClient, contactIds: string[]): Promise<Map<string, Match>> {
+  const result = new Map<string, Match>();
+  if (contactIds.length === 0) return result;
+  for (let round = 0; round < 20; round++) {
+    await client.query('savepoint lock_contacts');
+    const { rows: chains } = await client.query<{ start: string; survivor: string }>(
+      `with recursive chain as (
+         select id as start, id, merged_into, 0 as depth from contacts where id = any($1::uuid[])
+         union all
+         select chain.start, c.id, c.merged_into, chain.depth + 1
+           from contacts c join chain on c.id = chain.merged_into where chain.depth < 50
+       )
+       select start, id as survivor from chain where merged_into is null`,
+      [contactIds],
     );
-    if (!rows[0].merged_into) return { contactId: rows[0].id, createdAt: rows[0].created_at };
-    id = rows[0].merged_into;
+    const survivorOf = new Map(chains.map((r) => [r.start, r.survivor]));
+    const { rows } = await client.query<{ id: string; merged_into: string | null; created_at: Date }>(
+      'select id, merged_into, created_at from contacts where id = any($1::uuid[]) order by id for no key update',
+      [[...new Set(survivorOf.values())]],
+    );
+    if (rows.every((r) => r.merged_into === null)) {
+      await client.query('release savepoint lock_contacts');
+      for (const id of contactIds) {
+        const row = rows.find((r) => r.id === survivorOf.get(id))!;
+        result.set(id, { contactId: row.id, createdAt: row.created_at });
+      }
+      return result;
+    }
+    await client.query('rollback to savepoint lock_contacts');
   }
-  throw new Error(`contact ${contactId}: merge chain too long`);
+  throw new Error(`contacts ${contactIds.join(', ')}: kept being merged while we tried to lock them`);
 }
 
 /**
