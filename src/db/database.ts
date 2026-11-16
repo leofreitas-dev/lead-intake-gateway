@@ -74,7 +74,7 @@ export function describeUrl(connectionString: string): string {
  * here instead of crashing the process, and the broken connection is thrown away
  * instead of going back to the pool.
  */
-export async function checkout(pool: pg.Pool): Promise<{ client: pg.PoolClient; release(): void }> {
+export async function checkout(pool: pg.Pool): Promise<{ client: pg.PoolClient; release(discard?: boolean): void }> {
   const client = await pool.connect();
   let broken: Error | undefined;
   const onError = (err: Error) => {
@@ -83,9 +83,10 @@ export async function checkout(pool: pg.Pool): Promise<{ client: pg.PoolClient; 
   client.on('error', onError);
   return {
     client,
-    release: () => {
+    // discard: throw the connection away even if no error event came (a query failed in an unknown state).
+    release: (discard = false) => {
       client.off('error', onError);
-      client.release(broken ?? false);
+      client.release(broken ?? discard);
     },
   };
 }
