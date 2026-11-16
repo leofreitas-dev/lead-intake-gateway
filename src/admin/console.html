@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lead Intake Gateway · Console</title>
+<link rel="icon" href="data:,">
+<style>
+/* Everything is inline on purpose: the console works with no internet. */
+:root {
+  color-scheme: light;
+  --page: #f9f9f7; --surface: #fcfcfb; --card: #ffffff;
+  --ink: #0b0b0b; --ink-2: #52514e; --muted: #898781;
+  --grid: #e1e0d9; --axis: #c3c2b7; --ring: rgba(11,11,11,0.10);
+  --accent: #2a78d6; --accent-ink: #1c5cab; --accent-soft: #cde2fb;
+  --good: #0ca30c; --good-ink: #006300; --warning: #fab219; --serious: #ec835a; --critical: #d03b3b;
+  --radius: 10px;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-size: 15px; line-height: 1.45; color: var(--ink); background: var(--page);
+}
+* { box-sizing: border-box; }
+body { margin: 0; }
+button, input, textarea { font: inherit; color: inherit; }
+.num { font-variant-numeric: tabular-nums; }
+.muted { color: var(--muted); }
+.ink2 { color: var(--ink-2); }
+
+header { position: sticky; top: 0; z-index: 5; background: var(--card); border-bottom: 1px solid var(--grid); }
+.bar { max-width: 1680px; margin: 0 auto; padding: 0 32px; height: 64px; display: flex; align-items: center; gap: 28px; }
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 650; font-size: 16px; white-space: nowrap; }
+.brand .logo { width: 26px; height: 26px; border-radius: 7px; background: var(--accent); display: grid; place-items: center; color: #fff; font-size: 14px; font-weight: 700; }
+.brand small { font-weight: 450; color: var(--muted); }
+nav { display: flex; gap: 4px; height: 100%; }
+nav button { border: 0; background: none; padding: 0 16px; cursor: pointer; color: var(--ink-2); font-weight: 550; border-bottom: 3px solid transparent; display: flex; align-items: center; gap: 8px; }
+nav button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+.count { min-width: 22px; height: 20px; padding: 0 7px; border-radius: 10px; background: var(--accent); color: #fff; font-size: 12px; display: inline-grid; place-items: center; }
+.count.zero { background: var(--grid); color: var(--ink-2); }
+.spacer { flex: 1; }
+.live { color: var(--muted); font-size: 13px; display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--good); }
+.dot.stale { background: var(--critical); }
+.link { border: 0; background: none; color: var(--accent-ink); cursor: pointer; padding: 4px 6px; font-size: 13px; }
+
+.banner { background: #fff6dd; border-bottom: 1px solid #f3dc9b; color: #5c4300; font-size: 13.5px; }
+.banner .bar { height: auto; padding: 8px 32px; gap: 10px; }
+
+main { max-width: 1680px; margin: 0 auto; padding: 28px 32px 48px; }
+h2 { font-size: 13px; font-weight: 650; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-2); margin: 0 0 12px; }
+.card { background: var(--card); border: 1px solid var(--ring); border-radius: var(--radius); }
+
+/* ---------- Approvals ---------- */
+.approvals { display: grid; grid-template-columns: 440px 1fr; gap: 24px; align-items: start; }
+.list { display: flex; flex-direction: column; gap: 10px; }
+.item { text-align: left; width: 100%; border: 1px solid var(--ring); background: var(--card); border-radius: var(--radius); padding: 14px 16px; cursor: pointer; display: grid; gap: 6px; }
+.item:hover { border-color: var(--axis); }
+.item[aria-current="true"] { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+.item .top { display: flex; align-items: center; gap: 8px; }
+.item .who { font-weight: 600; }
+.item .when { margin-left: auto; color: var(--muted); font-size: 13px; }
+.item .msg { color: var(--ink-2); font-size: 14px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.chip { display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 8px; border-radius: 6px; font-size: 12.5px; font-weight: 550; background: #f0efec; color: var(--ink-2); white-space: nowrap; }
+.chip.accent { background: var(--accent-soft); color: var(--accent-ink); }
+.chip.urgent { background: #fde3e3; color: #8f1f1f; }
+.chip.warn { background: #fff0cc; color: #5c4300; }
+.chip.ok { background: #dff3df; color: var(--good-ink); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.detail { display: grid; gap: 18px; }
+.detail .head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.detail .head h1 { font-size: 22px; margin: 0; font-weight: 650; }
+.cols { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.panel { padding: 18px 20px; }
+.panel h3 { margin: 0 0 10px; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--ink-2); font-weight: 650; display: flex; align-items: center; gap: 8px; }
+.quote { white-space: pre-wrap; background: var(--surface); border-left: 3px solid var(--axis); padding: 10px 14px; border-radius: 4px; margin: 8px 0 0; }
+dl { display: grid; grid-template-columns: 120px 1fr; gap: 6px 12px; margin: 0; font-size: 14px; }
+dt { color: var(--muted); }
+dd { margin: 0; overflow-wrap: anywhere; }
+.meter { display: flex; align-items: center; gap: 8px; }
+.meter .track { width: 120px; height: 8px; border-radius: 4px; background: var(--grid); overflow: hidden; }
+.meter .fill { height: 100%; background: var(--accent); border-radius: 0 4px 4px 0; }
+.route { font-size: 17px; font-weight: 600; }
+.why { color: var(--ink-2); margin-top: 4px; }
+textarea { width: 100%; min-height: 190px; resize: vertical; border: 1px solid var(--axis); border-radius: 8px; padding: 12px 14px; background: var(--card); line-height: 1.5; }
+textarea:focus, input:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
+.actions { display: flex; align-items: center; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+.btn { border: 1px solid var(--axis); background: var(--card); border-radius: 8px; height: 38px; padding: 0 16px; cursor: pointer; font-weight: 600; }
+.btn:hover { background: var(--surface); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn.primary:hover { background: var(--accent-ink); }
+.btn.danger { color: var(--critical); }
+.btn:disabled { opacity: .5; cursor: default; }
+.note { font-size: 13px; color: var(--muted); }
+.problems { margin: 6px 0 0; padding-left: 18px; color: #8f1f1f; }
+.empty { padding: 48px; text-align: center; color: var(--ink-2); }
+.empty b { display: block; font-size: 18px; color: var(--ink); margin-bottom: 6px; }
+.history { margin-top: 28px; }
+.history table td:nth-child(4) { max-width: 560px; }
+
+/* ---------- Dashboard ---------- */
+.tiles { display: grid; grid-template-columns: repeat(6, 1fr); gap: 16px; margin-bottom: 24px; }
+.tile { padding: 16px 18px; }
+.tile .label { font-size: 13px; color: var(--ink-2); }
+.tile .value { font-size: 30px; font-weight: 650; margin-top: 4px; letter-spacing: -.01em; }
+.tile .sub { font-size: 13px; color: var(--muted); margin-top: 2px; }
+.grid2 { display: grid; grid-template-columns: 1.15fr 1fr; gap: 24px; margin-bottom: 24px; }
+.section { padding: 18px 20px; }
+.hbars { display: grid; grid-template-columns: 110px 1fr 56px; gap: 10px 12px; align-items: center; }
+.hbars .lab { color: var(--ink-2); }
+.hbars .track { height: 20px; position: relative; border-left: 1px solid var(--axis); }
+.hbars .fill { height: 100%; background: var(--accent); border-radius: 0 4px 4px 0; min-width: 2px; }
+.hbars .fill:hover { background: var(--accent-ink); }
+.hbars .v { text-align: right; font-weight: 600; }
+.foot { font-size: 13px; color: var(--muted); margin-top: 12px; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th { text-align: left; font-weight: 600; color: var(--ink-2); font-size: 12.5px; text-transform: uppercase; letter-spacing: .03em; padding: 8px 10px; border-bottom: 1px solid var(--axis); }
+td { padding: 9px 10px; border-bottom: 1px solid var(--grid); vertical-align: top; }
+td.r, th.r { text-align: right; }
+.status { display: inline-flex; align-items: center; gap: 8px; font-weight: 650; font-size: 17px; }
+.status i { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; color: #fff; font-style: normal; font-size: 13px; }
+.status.good i { background: var(--good); }
+.status.warning i { background: var(--warning); color: var(--ink); }
+.status.critical i { background: var(--critical); }
+.status.unknown i { background: var(--muted); }
+
+/* ---------- Login ---------- */
+.login { position: fixed; inset: 0; background: var(--page); display: grid; place-items: center; z-index: 10; }
+.login form { width: 420px; padding: 28px; display: grid; gap: 14px; }
+.login h1 { margin: 0; font-size: 20px; }
+.login input { height: 42px; border: 1px solid var(--axis); border-radius: 8px; padding: 0 12px; background: var(--card); }
+.toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--ink); color: #fff; padding: 10px 18px; border-radius: 8px; font-size: 14px; opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 20; }
+.toast.show { opacity: 1; }
+[hidden] { display: none !important; }
+@media (max-width: 1200px) {
+  .approvals, .grid2, .cols { grid-template-columns: 1fr; }
+  .tiles { grid-template-columns: repeat(3, 1fr); }
+}
+</style>
+</head>
+<body>
+<div class="login" id="login" hidden>
+  <form class="card" id="login-form">
+    <h1>Lead Intake Gateway</h1>
+    <div class="ink2">Enter the admin token (<code>ADMIN_TOKEN</code>) to open the console.</div>
+    <input id="token" type="password" autocomplete="off" placeholder="Admin token" aria-label="Admin token">
+    <div class="note" id="demo-hint" hidden>Demo mode: the token is <code>demo-only-admin-token</code>. It is public; set <code>ADMIN_TOKEN</code> before real use.</div>
+    <div class="note" id="login-error" style="color: var(--critical)" hidden></div>
+    <button class="btn primary" type="submit">Open the console</button>
+  </form>
+</div>
+
+<header>
+  <div class="bar">
+    <div class="brand"><span class="logo">L</span>Lead Intake Gateway <small>Juniper Lane Realty · demo</small></div>
+    <nav role="tablist">
+      <button role="tab" id="tab-approvals" aria-selected="true">Approvals <span class="count" id="waiting-count">0</span></button>
+      <button role="tab" id="tab-dashboard" aria-selected="false">Dashboard</button>
+    </nav>
+    <div class="spacer"></div>
+    <div class="live"><span class="dot" id="live-dot"></span><span id="live-text">connecting…</span></div>
+    <button class="link" id="logout" type="button">Sign out</button>
+  </div>
+</header>
+<div class="banner" id="demo-banner" hidden><div class="bar">⚠ Demo admin token in use. Anyone who can reach this port can approve replies: set <b>ADMIN_TOKEN</b> before real use. Approved replies go to the <b>outbox/</b> folder; nothing is ever sent.</div></div>
+
+<main>
+  <section id="view-approvals">
+    <div class="approvals">
+      <div>
+        <h2>Waiting for a person</h2>
+        <div class="list" id="list"></div>
+      </div>
+      <div id="detail"></div>
+    </div>
+    <div class="history card section" id="history"></div>
+  </section>
+
+  <section id="view-dashboard" hidden>
+    <div class="tiles" id="tiles"></div>
+    <div class="grid2">
+      <div class="card section">
+        <h2>Leads by channel</h2>
+        <div class="hbars" id="channels"></div>
+        <div class="foot" id="channels-foot"></div>
+      </div>
+      <div class="card section">
+        <h2>CRM delivery</h2>
+        <div id="crm"></div>
+      </div>
+    </div>
+    <div class="grid2">
+      <div class="card section">
+        <h2>Dead-letter</h2>
+        <div id="dead"></div>
+      </div>
+      <div class="card section">
+        <h2>Queue (not done)</h2>
+        <div id="queue"></div>
+        <h2 style="margin-top: 22px">AI cost</h2>
+        <div id="ai"></div>
+      </div>
+    </div>
+  </section>
+</main>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+'use strict';
+const DEMO_TOKEN = "__DEMO_TOKEN__";
+const $ = (id) => document.getElementById(id);
+// Every value from the server is put in as text, never as HTML: lead messages are written by the public.
+const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+const usd = (n) => '$' + (n ?? 0).toFixed(n >= 1 ? 2 : 4);
+const int = (n) => (n ?? 0).toLocaleString('en-US');
+const ago = (t) => {
+  if (!t) return '—';
+  const s = Math.max(0, (Date.now() - new Date(t).getTime()) / 1000);
+  if (s < 60) return `${Math.round(s)} s ago`;
+  if (s < 3600) return `${Math.round(s / 60)} min ago`;
+  if (s < 86400) return `${Math.round(s / 3600)} h ago`;
+  return new Date(t).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+};
+const ROUTES = { on_call_agent: 'On-call agent', buyer_team: 'Buyer team', listing_team: 'Listing team', rentals_desk: 'Rentals desk', spanish_agent: 'Spanish-speaking agent', general_inbox: 'General inbox', manual_review: 'Manual review', archive: 'Archive' };
+const CHANNELS = { form: 'Website form', email: 'Email', whatsapp: 'WhatsApp', portal: 'Listing portal' };
+const LANG = (c) => { try { return new Intl.DisplayNames(['en'], { type: 'language' }).of(c); } catch { return c; } };
+
+let token = sessionStorage.getItem('lig-token') || '';
+let tab = 'approvals';
+let drafts = [];
+let selected = null;
+let dirty = false;
+let lastOk = 0;
+
+async function api(path, options = {}) {
+  const res = await fetch(path, { ...options, headers: { authorization: `Bearer ${token}`, ...(options.body ? { 'content-type': 'application/json' } : {}) } });
+  if (res.status === 401) { showLogin('That token was not accepted.'); throw new Error('unauthorized'); }
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw Object.assign(new Error(body.error || res.statusText), { status: res.status, body });
+  lastOk = Date.now();
+  return body;
+}
+
+function toast(text) {
+  const t = $('toast');
+  t.textContent = text;
+  t.classList.add('show');
+  clearTimeout(toast.timer);
+  toast.timer = setTimeout(() => t.classList.remove('show'), 2600);
+}
+
+// ---------- Login ----------
+function showLogin(error) {
+  $('login').hidden = false;
+  $('demo-hint').hidden = !DEMO_TOKEN;
+  $('login-error').hidden = !error;
+  $('login-error').textContent = error || '';
+  if (DEMO_TOKEN && !$('token').value) $('token').value = DEMO_TOKEN;
+  $('token').focus();
+}
+$('login-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  token = $('token').value.trim();
+  try {
+    await api('/api/dashboard');
+    sessionStorage.setItem('lig-token', token);
+    $('login').hidden = true;
+    refresh();
+  } catch {}
+});
+$('logout').addEventListener('click', () => { sessionStorage.removeItem('lig-token'); token = ''; $('token').value = ''; showLogin(); });
+$('demo-banner').hidden = !DEMO_TOKEN;
+
+// ---------- Tabs ----------
+function show(name) {
+  tab = name;
+  for (const t of ['approvals', 'dashboard']) {
+    $('tab-' + t).setAttribute('aria-selected', String(t === name));
+    $('view-' + t).hidden = t !== name;
+  }
+  refresh();
+}
+$('tab-approvals').addEventListener('click', () => show('approvals'));
+$('tab-dashboard').addEventListener('click', () => show('dashboard'));
+
+// ---------- Approvals ----------
+function chipsFor(d) {
+  const u = d.understood;
+  return `<span class="chip accent">${esc(u.intent ?? '?')}</span>`
+    + `<span class="chip ${u.urgency === 'high' ? 'urgent' : ''}">urgency ${esc(u.urgency ?? '?')}</span>`
+    + `<span class="chip">${esc(LANG(d.language || u.language))}</span>`
+    + (d.status === 'blocked' ? '<span class="chip warn">⚠ write by hand</span>' : '');
+}
+
+function renderList() {
+  $('waiting-count').textContent = drafts.length;
+  $('waiting-count').classList.toggle('zero', drafts.length === 0);
+  if (!drafts.length) {
+    $('list').innerHTML = '<div class="card empty"><b>Nothing waiting</b>Every reply draft has been decided.</div>';
+    return;
+  }
+  $('list').innerHTML = drafts.map((d) => `
+    <button class="item" data-id="${esc(d.id)}" aria-current="${d.id === selected}">
+      <div class="top"><span class="who">${esc(d.lead.name || 'No name')}</span><span class="chip">${esc(CHANNELS[d.lead.source] || d.lead.source)}</span><span class="when">${esc(ago(d.lead.occurred_at))}</span></div>
+      <div class="msg">${esc(d.lead.message || '(no message)')}</div>
+      <div class="chips">${chipsFor(d)}</div>
+    </button>`).join('');
+  for (const el of $('list').querySelectorAll('.item')) el.addEventListener('click', () => select(el.dataset.id));
+}
+
+function select(id) {
+  if (dirty && id !== selected && !confirm('Discard your edits to this reply?')) return;
+  selected = id;
+  dirty = false;
+  renderList();
+  renderDetail();
+}
+
+function renderDetail() {
+  const d = drafts.find((x) => x.id === selected);
+  if (!d) { $('detail').innerHTML = drafts.length ? '<div class="card empty"><b>Pick a draft</b>Choose one on the left to read and decide.</div>' : ''; return; }
+  const u = d.understood, l = d.lead;
+  const confidence = Math.round((u.confidence ?? 0) * 100);
+  $('detail').innerHTML = `
+    <div class="detail">
+      <div class="head"><h1>${esc(l.name || 'No name')}</h1><span class="chips">${chipsFor(d)}</span>
+        <span class="muted">${d.contact_leads > 1 ? `· ${d.contact_leads} messages from this person` : ''}${d.replaces ? ` · replaces ${d.replaces} older draft${d.replaces > 1 ? 's' : ''}` : ''}</span></div>
+      <div class="cols">
+        <div class="card panel">
+          <h3>Original lead</h3>
+          <dl>
+            <dt>Channel</dt><dd>${esc(CHANNELS[l.source] || l.source)}</dd>
+            <dt>Received</dt><dd>${esc(new Date(l.occurred_at).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }))}</dd>
+            <dt>Email</dt><dd>${esc(l.email || '—')}</dd>
+            <dt>Phone</dt><dd>${esc(l.phone || '—')}</dd>
+            ${l.listing_ref ? `<dt>Listing</dt><dd>${esc(l.listing_ref)}</dd>` : ''}
+          </dl>
+          <p class="quote">${esc(l.message || '(no message)')}</p>
+        </div>
+        <div class="card panel">
+          <h3>What the AI understood</h3>
+          <dl>
+            <dt>Intent</dt><dd>${esc(u.intent)}</dd>
+            <dt>Urgency</dt><dd>${esc(u.urgency)}</dd>
+            <dt>Budget</dt><dd>${esc((u.budget_band || '').replaceAll('_', ' '))}</dd>
+            <dt>Language</dt><dd>${esc(LANG(u.language))}</dd>
+            <dt>Confidence</dt><dd><span class="meter"><span class="track"><span class="fill" style="width:${confidence}%"></span></span><span class="num">${confidence}%</span></span></dd>
+            <dt>Evidence</dt><dd class="ink2">${esc(u.evidence)}</dd>
+          </dl>
+          <h3 style="margin-top:16px">Route, decided by code</h3>
+          <div class="route">${esc(ROUTES[d.route.route] || d.route.route)}</div>
+          <div class="why">${esc(d.route.reason)} <span class="muted">(rule “${esc(d.route.rule)}”)</span></div>
+        </div>
+      </div>
+      <div class="card panel">
+        <h3>Reply draft ${d.status === 'blocked' ? '<span class="chip warn">⚠ no safe AI draft: write it by hand</span>' : `<span class="chip">written by AI · ${esc(d.ai_mode === 'recorded' ? 'recorded answer' : 'live')} · ${usd(d.cost_usd)}</span>`}</h3>
+        ${d.status === 'blocked' ? `<div class="note">The AI's draft broke a rule checked by code:</div><ul class="problems">${d.problems.map((p) => `<li>${esc(p)}</li>`).join('')}</ul>` : ''}
+        <textarea id="reply" aria-label="Reply text" spellcheck="true" style="margin-top:8px">${esc(d.ai_body || '')}</textarea>
+        <div class="actions">
+          <button class="btn primary" id="approve">${d.status === 'blocked' ? 'Approve my reply' : 'Approve'}</button>
+          <button class="btn" id="reject-toggle">Reject</button>
+          <span class="note" id="edit-note">${d.status === 'blocked' ? '' : 'Edit the text above to approve an edited reply.'}</span>
+          <span class="spacer"></span>
+          <span class="note">Approved replies are written to <b>outbox/</b>, never sent.</span>
+        </div>
+        <div class="actions" id="reject-box" hidden>
+          <input id="reject-reason" placeholder="Why? (optional, kept on the timeline)" style="flex:1; height:38px; border:1px solid var(--axis); border-radius:8px; padding:0 12px">
+          <button class="btn danger" id="reject">Reject this draft</button>
+        </div>
+      </div>
+    </div>`;
+  const area = $('reply');
+  area.addEventListener('input', () => {
+    dirty = area.value.trim() !== (d.ai_body || '').trim();
+    $('approve').textContent = d.status === 'blocked' ? 'Approve my reply' : dirty ? 'Approve edited reply' : 'Approve';
+    $('edit-note').textContent = dirty ? 'Edited: it will be saved as an edited reply.' : (d.status === 'blocked' ? '' : 'Edit the text above to approve an edited reply.');
+  });
+  $('approve').addEventListener('click', () => decide(d, 'approve', { body: area.value }));
+  $('reject-toggle').addEventListener('click', () => { $('reject-box').hidden = false; $('reject-reason').focus(); });
+  $('reject').addEventListener('click', () => decide(d, 'reject', { reason: $('reject-reason').value }));
+}
+
+async function decide(d, action, payload) {
+  for (const b of document.querySelectorAll('#detail .btn')) b.disabled = true;
+  try {
+    const r = await api(`/api/drafts/${encodeURIComponent(d.id)}/${action}`, { method: 'POST', body: JSON.stringify(payload) });
+    toast(r.status === 'rejected' ? 'Rejected: this reply never goes out.' : `${r.status === 'edited' ? 'Edited and approved' : 'Approved'}: written to outbox/${r.outbox_file}`);
+    const i = drafts.findIndex((x) => x.id === d.id);
+    drafts.splice(i, 1);
+    selected = drafts[Math.min(i, drafts.length - 1)]?.id ?? null;
+    dirty = false;
+    renderList(); renderDetail(); loadHistory();
+  } catch (err) {
+    const why = { already_decided: `Someone already decided this draft (${err.body?.status}).`, empty_reply: 'The reply is empty.', too_long: 'The reply is too long.', not_found: 'This draft no longer exists.' }[err.message] || err.message;
+    toast(why);
+    for (const b of document.querySelectorAll('#detail .btn')) b.disabled = false;
+    if (err.status === 409 || err.status === 404) { dirty = false; loadApprovals(true); }
+  }
+}
+
+async function loadApprovals(force) {
+  const r = await api('/api/drafts');
+  const before = JSON.stringify(drafts.map((d) => d.id));
+  drafts = r.drafts;
+  if (!drafts.some((d) => d.id === selected)) { if (dirty && !force) return; selected = drafts[0]?.id ?? null; dirty = false; }
+  renderList();
+  if (force || !dirty && (before !== JSON.stringify(drafts.map((d) => d.id)) || !$('reply'))) renderDetail();
+}
+
+async function loadHistory() {
+  const r = await api('/api/drafts?status=decided');
+  const rows = r.drafts.slice(0, 8);
+  $('history').innerHTML = `<h2>Recent decisions</h2>` + (rows.length ? `<table><thead><tr><th>When</th><th>Lead</th><th>Decision</th><th>Reply</th><th>Outbox file</th></tr></thead><tbody>${rows.map((d) => `
+    <tr><td class="muted">${esc(ago(d.decided_at))}</td><td>${esc(d.lead.name || '—')}</td>
+    <td><span class="chip ${d.status === 'rejected' ? 'urgent' : 'ok'}">${d.status === 'rejected' ? '✕' : '✓'} ${esc(d.status)}</span></td>
+    <td class="ink2">${esc(d.status === 'rejected' ? (d.reject_reason || 'no reason given') : d.final_body)}</td>
+    <td class="muted">${esc(d.outbox_file || '—')}</td></tr>`).join('')}</tbody></table>` : '<div class="muted">No decisions yet.</div>');
+}
+
+// ---------- Dashboard ----------
+async function loadDashboard() {
+  const d = await api('/api/dashboard');
+  const totalLeads = d.people.leads;
+  const resends = d.channels.reduce((n, c) => n + c.resends, 0);
+  const queued = d.queue.filter((q) => q.status === 'pending' || q.status === 'running').reduce((n, q) => n + q.n, 0);
+  const waiting = (d.drafts.pending || 0) + (d.drafts.blocked || 0);
+  const tiles = [
+    ['Leads received', int(totalLeads), `${int(d.channels.reduce((n, c) => n + c.webhooks, 0))} webhooks stored`],
+    ['People', int(d.people.contacts), `${int(d.people.merges)} merged across channels`],
+    ['Duplicates caught', int(resends + d.people.merges), `${int(resends)} resent webhooks · ${int(d.people.merges)} merges`],
+    ['Queue', int(queued), 'jobs pending or running'],
+    ['Replies', int(waiting), `waiting · ${int((d.drafts.approved || 0) + (d.drafts.edited || 0))} approved · ${int(d.drafts.rejected || 0)} rejected`],
+    ['AI cost', usd(d.ai.total_usd), `${int(d.ai.rows.reduce((n, r) => n + r.calls, 0))} calls in total`],
+  ];
+  $('tiles').innerHTML = tiles.map(([label, value, sub]) => `<div class="card tile"><div class="label">${esc(label)}</div><div class="value num">${esc(value)}</div><div class="sub">${esc(sub)}</div></div>`).join('');
+
+  const max = Math.max(1, ...d.channels.map((c) => c.leads));
+  $('channels').innerHTML = d.channels.length ? d.channels.map((c) => `
+    <div class="lab">${esc(CHANNELS[c.source] || c.source)}</div>
+    <div class="track"><div class="fill" style="width:${(c.leads / max) * 100}%" title="${esc(`${CHANNELS[c.source] || c.source}: ${c.leads} leads, ${c.resends} resends caught, ${c.rejected} unreadable`)}"></div></div>
+    <div class="v num">${int(c.leads)}</div>`).join('') : '<div class="muted">No leads yet.</div>';
+  $('channels-foot').textContent = d.channels.length ? d.channels.map((c) => `${CHANNELS[c.source] || c.source}: ${c.resends} resent, ${c.rejected} unreadable`).join(' · ') : '';
+
+  const b = d.crm.breaker;
+  const state = !b ? ['unknown', '?', 'Not known by this process'] : b.state === 'closed' ? ['good', '✓', 'Closed: delivering'] : b.state === 'half_open' ? ['warning', '…', 'Half-open: one trial delivery'] : ['critical', '✕', `Open: paused, retry in ${Math.ceil(b.reopensInMs / 1000)} s`];
+  $('crm').innerHTML = `
+    <div class="status ${state[0]}"><i aria-hidden="true">${state[1]}</i>Circuit breaker · ${esc(state[2])}</div>
+    <dl style="margin-top:14px">
+      <dt>Destination</dt><dd>${esc(d.crm.url || '—')}</dd>
+      <dt>In the CRM</dt><dd class="num">${int(d.crm.contacts)} contacts · ${int(d.crm.deliveries)} confirmed deliveries</dd>
+      <dt>Last success</dt><dd>${esc(ago(b?.lastSuccessAt || d.crm.last_delivered_at))}</dd>
+      <dt>Last failure</dt><dd>${b?.lastFailureAt ? `${esc(ago(b.lastFailureAt))} <span class="ink2">· ${esc(b.lastFailure)}</span>` : '—'}</dd>
+      ${b ? `<dt>Failures in a row</dt><dd class="num">${b.failuresInARow} of ${b.threshold} to open</dd>` : ''}
+    </dl>`;
+
+  $('dead').innerHTML = d.dead_letter.length ? `
+    <div class="actions" style="margin:0 0 12px"><span class="ink2">${d.dead_letter.length} job${d.dead_letter.length > 1 ? 's' : ''} gave up after every retry.</span><span class="spacer"></span><button class="btn primary" id="replay-all">Replay all</button></div>
+    <table><thead><tr><th>Job</th><th>Kind</th><th class="r">Attempts</th><th>Last error</th><th>Failed</th><th></th></tr></thead><tbody>${d.dead_letter.map((j) => `
+      <tr><td class="num">#${esc(j.id)}</td><td>${esc(j.kind)}</td><td class="r num">${esc(j.attempts)}</td><td class="ink2">${esc(j.last_error)}</td><td class="muted">${esc(ago(j.failed_at))}</td>
+      <td class="r"><button class="btn replay" data-id="${esc(j.id)}">Replay</button></td></tr>`).join('')}</tbody></table>`
+    : '<div class="status good"><i aria-hidden="true">✓</i>Empty: nothing gave up</div>';
+  for (const el of document.querySelectorAll('#dead .replay')) el.addEventListener('click', () => replay({ ids: [el.dataset.id] }));
+  $('replay-all')?.addEventListener('click', () => replay({ all: true }));
+
+  const kinds = [...new Set(d.queue.map((q) => q.kind))];
+  const cell = (k, s) => d.queue.find((q) => q.kind === k && q.status === s)?.n ?? 0;
+  $('queue').innerHTML = kinds.length ? `<table><thead><tr><th>Job</th><th class="r">Pending</th><th class="r">Running</th><th class="r">Dead</th></tr></thead><tbody>${kinds.map((k) => `
+    <tr><td>${esc(k)}</td><td class="r num">${cell(k, 'pending')}</td><td class="r num">${cell(k, 'running')}</td><td class="r num">${cell(k, 'dead')}</td></tr>`).join('')}</tbody></table>`
+    : '<div class="status good"><i aria-hidden="true">✓</i>Drained: every job is done</div>';
+
+  $('ai').innerHTML = d.ai.rows.length ? `<table><thead><tr><th>Purpose</th><th>Mode</th><th class="r">Calls</th><th class="r">Tokens in / out</th><th class="r">Cost</th></tr></thead><tbody>${d.ai.rows.map((r) => `
+    <tr><td>${esc(r.purpose === 'draft' ? 'Reply drafts' : 'Classification')}</td><td>${esc(r.ai_mode === 'recorded' ? 'recorded (replayed)' : 'live')}</td><td class="r num">${int(r.calls)}</td>
+    <td class="r num">${int(r.input_tokens)} / ${int(r.output_tokens)}</td><td class="r num">${usd(r.cost_usd)}</td></tr>`).join('')}
+    <tr><td colspan="4"><b>Total</b></td><td class="r num"><b>${usd(d.ai.total_usd)}</b></td></tr></tbody></table>
+    <div class="foot">Recorded answers show what the real calls cost when they were recorded; replaying them costs nothing.</div>`
+    : '<div class="muted">No AI calls yet.</div>';
+}
+
+async function replay(payload) {
+  try {
+    const r = await api('/replay', { method: 'POST', body: JSON.stringify(payload) });
+    toast(`${r.replayed} job${r.replayed === 1 ? '' : 's'} back in the queue`);
+    loadDashboard();
+  } catch (err) { toast(err.message); }
+}
+
+// ---------- Refresh ----------
+async function refresh() {
+  if (!token) return showLogin();
+  try {
+    if (tab === 'approvals') await Promise.all([loadApprovals(), loadHistory()]);
+    else await Promise.all([loadDashboard(), api('/api/drafts').then((r) => { $('waiting-count').textContent = r.count; $('waiting-count').classList.toggle('zero', r.count === 0); })]);
+  } catch {}
+  const fresh = Date.now() - lastOk < 10000;
+  $('live-dot').classList.toggle('stale', !fresh);
+  $('live-text').textContent = fresh ? `live · updated ${new Date(lastOk).toLocaleTimeString('en-US')}` : 'cannot reach the server';
+}
+setInterval(refresh, 4000);
+refresh();
+</script>
+</body>
+</html>

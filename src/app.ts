@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import Fastify from 'fastify';
 import type pg from 'pg';
+import type { CrmStatus } from './admin/dashboard.ts';
+import { consolePage } from './admin/page.ts';
 import { adminRoutes } from './admin/routes.ts';
 import type { AdminConfig, GatewayConfig } from './config.ts';
 import { webhookRoutes } from './gateway/routes.ts';
@@ -10,8 +12,10 @@ export interface AppDeps {
   pool: pg.Pool;
   log: Logger;
   gateway: GatewayConfig;
-  /** Admin endpoints (dead-letter, replay). Left out, they are not served. */
+  /** Admin endpoints (dead-letter, replay) and the approval screen. Left out, they are not served. */
   admin?: AdminConfig;
+  /** The CRM's state as this process sees it (the circuit breaker), for the panel. */
+  crmStatus?: () => CrmStatus;
   /** Clock for signature and rate-limit checks. Injected in tests. */
   now?: () => number;
 }
@@ -22,7 +26,7 @@ const SAFE_TRACE_ID = /^[A-Za-z0-9._:-]{1,100}$/;
 
 export type App = ReturnType<typeof buildApp>;
 
-export function buildApp({ pool, log, gateway, admin, now }: AppDeps) {
+export function buildApp({ pool, log, gateway, admin, crmStatus, now }: AppDeps) {
   const app = Fastify({
     loggerInstance: log,
     // Keep the caller's trace id if it sends a sane one, so one id follows the
@@ -55,7 +59,20 @@ export function buildApp({ pool, log, gateway, admin, now }: AppDeps) {
   });
 
   app.register(webhookRoutes, { pool, config: gateway, now });
-  if (admin) app.register(adminRoutes, { pool, admin });
+  if (admin) {
+    app.register(adminRoutes, { pool, admin, crmStatus });
+    // The approval screen. The page itself holds no data: it asks for the admin
+    // token and calls the /api routes above, which check it on every request.
+    app.get('/', async (_request, reply) =>
+      reply
+        .type('text/html; charset=utf-8')
+        .header('cache-control', 'no-store')
+        // Nothing from the internet: scripts, styles and requests stay on this server.
+        .header('content-security-policy', "default-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'")
+        .header('x-content-type-options', 'nosniff')
+        .send(consolePage(admin.usingDemoToken)),
+    );
+  }
 
   return app;
 }
