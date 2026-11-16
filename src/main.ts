@@ -10,7 +10,7 @@ import { createDelivery } from './delivery/deliver-job.ts';
 import { CLASSIFY_JOB, makeClassifyHandler } from './leads/classify-job.ts';
 import { processLead } from './leads/process.ts';
 import { createLogger } from './logger.ts';
-import { startWorker } from './queue/worker.ts';
+import { startWorker, WORKER_ID } from './queue/worker.ts';
 
 loadDotEnv();
 const config = loadConfig();
@@ -26,8 +26,9 @@ if (config.gateway.usingDemoSecrets) {
 if (config.admin.usingDemoToken) {
   log.warn('using the built-in DEMO admin token for /dead-letter and /replay; set ADMIN_TOKEN before real use');
 }
-const app = buildApp({ pool: db.pool, log, gateway: config.gateway, admin: config.admin });
-await app.listen({ port: config.port, host: config.host });
+// ROLE=worker: an extra worker process, sharing the queue, with no HTTP port.
+const app = config.role === 'all' ? buildApp({ pool: db.pool, log, gateway: config.gateway, admin: config.admin }) : undefined;
+await app?.listen({ port: config.port, host: config.host });
 const classifier = config.ai.mode === 'live' ? new AnthropicClassifier(config.ai.model) : new RecordedClassifier();
 log.info(
   { ai_mode: classifier.mode, model: classifier.model },
@@ -43,7 +44,8 @@ log.info(
   { crm: config.crm.url, max_attempts: config.crm.maxAttempts, rate_limit_per_sec: config.crm.rateLimitPerSec, breaker_threshold: config.crm.breakerThreshold },
   `CRM deliveries go to ${config.crm.url} (start the fake one with: npm run crm)`,
 );
-log.info(`ready: http://${config.host === '0.0.0.0' ? 'localhost' : config.host}:${config.port}/ready`);
+if (app) log.info(`ready: http://${config.host === '0.0.0.0' ? 'localhost' : config.host}:${config.port}/ready`);
+else log.info(`ready: worker-only process ${WORKER_ID}, no HTTP port`);
 
 // Stop taking requests and let the ones in flight finish; let the workers finish
 // the jobs they hold; then close the connection pool; Postgres goes last.
@@ -53,7 +55,7 @@ async function shutdown(signal: string) {
   stopping = true;
   log.info({ signal }, 'shutting down');
   try {
-    await app.close();
+    await app?.close();
     await Promise.all(workers.map((w) => w.stop()));
     await db.close();
     process.exit(0);

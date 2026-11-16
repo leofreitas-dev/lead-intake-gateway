@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { migrate } from '../src/db/migrate.ts';
 import { backoffMs } from '../src/queue/backoff.ts';
-import { drain, type ExternalJobHandler, type JobHandler, runOneJob, runOneLeasedJob, startWorker } from '../src/queue/worker.ts';
+import { drain, type ExternalJobHandler, type JobHandler, runOneJob, runOneLeasedJob, startWorker, WORKER_ID } from '../src/queue/worker.ts';
 import { createTestDatabase, silentLog, type TestDatabase } from './helpers.ts';
 
 describe('backoff with jitter', () => {
@@ -168,6 +168,17 @@ describe('job queue', () => {
       expect(await runOneLeasedJob(leased(async () => void (during = await row())))).toBe('done');
       expect(during).toEqual({ status: 'running', attempts: 1, leased: true, last_error: null });
       expect(await row()).toEqual({ status: 'done', attempts: 1, leased: null, last_error: null });
+    });
+
+    it('records which process holds the lease (host:pid by default)', async () => {
+      await db.pool.query(`insert into jobs (kind) values ('test'), ('test')`);
+      let holder: string | undefined;
+      const lockedBy = async () => (await db.pool.query(`select locked_by from jobs where status = 'running'`)).rows[0]?.locked_by;
+      await runOneLeasedJob(leased(async () => void (holder = await lockedBy())));
+      expect(holder).toBe(WORKER_ID);
+      expect(WORKER_ID).toMatch(new RegExp(`:${process.pid}$`));
+      await runOneLeasedJob(leased(async () => void (holder = await lockedBy()), { workerId: 'worker-b' }));
+      expect(holder).toBe('worker-b');
     });
 
     it('a failure frees the job for a retry later', async () => {

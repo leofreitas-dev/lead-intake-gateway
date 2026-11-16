@@ -1,3 +1,4 @@
+import os from 'node:os';
 import type pg from 'pg';
 import { checkout } from '../db/database.ts';
 import type { Logger } from '../logger.ts';
@@ -70,7 +71,12 @@ export interface LeasedWorkerOptions extends CommonOptions {
   external: ExternalJobHandler;
   /** How long a claimed job stays reserved. If the worker dies, the job frees itself after this. */
   leaseMs?: number;
+  /** Written on the job while it is leased, to see which process holds it. Default host:pid. */
+  workerId?: string;
 }
+
+/** This process, as written in jobs.locked_by: host and pid. */
+export const WORKER_ID = `${os.hostname()}:${process.pid}`;
 
 export type AnyWorkerOptions = WorkerOptions | LeasedWorkerOptions;
 
@@ -154,7 +160,7 @@ export async function runOneLeasedJob(opts: LeasedWorkerOptions): Promise<JobOut
   const { pool, log, kind, external, leaseMs = 30_000 } = opts;
   const { rows } = await pool.query<Job>(
     `update jobs
-        set status = 'running', attempts = attempts + 1, updated_at = now(),
+        set status = 'running', attempts = attempts + 1, updated_at = now(), locked_by = $3,
             locked_until = now() + make_interval(secs => $2::double precision / 1000)
       where id = (
         select id from jobs
@@ -165,7 +171,7 @@ export async function runOneLeasedJob(opts: LeasedWorkerOptions): Promise<JobOut
          limit 1
          for update skip locked)
       returning ${JOB_COLUMNS}`,
-    [kind, leaseMs],
+    [kind, leaseMs, opts.workerId ?? WORKER_ID],
   );
   const job = rows[0];
   if (!job) return 'empty';

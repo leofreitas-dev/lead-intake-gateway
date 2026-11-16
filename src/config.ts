@@ -25,6 +25,11 @@ export interface Config {
   logPretty: boolean;
   /** Jobs the worker runs at the same time. */
   workerConcurrency: number;
+  /**
+   * What this process runs: "all" (HTTP and workers, the default) or "worker"
+   * (only the workers: an extra worker process, with no port of its own).
+   */
+  role: 'all' | 'worker';
   gateway: GatewayConfig;
   ai: AiConfig;
   crm: CrmConfig;
@@ -50,6 +55,8 @@ export interface CrmConfig {
   breakerCooldownMs: number;
   /** Deliveries in flight at the same time. */
   concurrency: number;
+  /** A delivery whose worker died is taken by another one after this. */
+  leaseMs: number;
 }
 
 export interface AdminConfig {
@@ -104,6 +111,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, isTerminal = Bo
     // Pretty in a terminal, JSON when piped to a file or a log tool. LOG_PRETTY overrides.
     logPretty: env.LOG_PRETTY ? env.LOG_PRETTY === '1' || env.LOG_PRETTY === 'true' : isTerminal,
     workerConcurrency: toPositiveInt(env.WORKER_CONCURRENCY, 4, 'WORKER_CONCURRENCY'),
+    role: toRole(env.ROLE),
     gateway: loadGatewayConfig(env),
     ai: loadAiConfig(env),
     crm: {
@@ -117,9 +125,16 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, isTerminal = Bo
       breakerThreshold: toPositiveInt(env.CIRCUIT_FAILURE_THRESHOLD, 5, 'CIRCUIT_FAILURE_THRESHOLD'),
       breakerCooldownMs: toPositiveInt(env.CIRCUIT_COOLDOWN_MS, 15_000, 'CIRCUIT_COOLDOWN_MS'),
       concurrency: toPositiveInt(env.DELIVERY_CONCURRENCY, 4, 'DELIVERY_CONCURRENCY'),
+      leaseMs: toPositiveInt(env.DELIVERY_LEASE_MS, 30_000, 'DELIVERY_LEASE_MS'),
     },
     admin: loadAdminConfig(env),
   };
+}
+
+function toRole(value: string | undefined): Config['role'] {
+  if (!value || value === 'all') return 'all';
+  if (value === 'worker') return 'worker';
+  throw new Error(`ROLE must be "all" or "worker", got "${value}"`);
 }
 
 function loadAdminConfig(env: NodeJS.ProcessEnv): AdminConfig {

@@ -26,9 +26,15 @@ describe('loadConfig', () => {
     expect(config.ai).toEqual({ mode: 'recorded', model: 'claude-haiku-5-5', minConfidence: 0.7 });
     expect(config.crm).toEqual({
       url: 'http://127.0.0.1:4010', timeoutMs: 3000, rateLimitPerSec: 5, rateLimitBurst: 5, maxAttempts: 10,
-      backoffBaseMs: 1000, backoffMaxMs: 600000, breakerThreshold: 5, breakerCooldownMs: 15000, concurrency: 4,
+      backoffBaseMs: 1000, backoffMaxMs: 600000, breakerThreshold: 5, breakerCooldownMs: 15000, concurrency: 4, leaseMs: 30000,
     });
     expect(config.admin).toEqual({ token: 'demo-only-admin-token', usingDemoToken: true });
+  });
+
+  it('runs HTTP and workers by default; ROLE=worker runs only the workers', () => {
+    expect(loadConfig({}, false).role).toBe('all');
+    expect(loadConfig({ ROLE: 'worker' }, false).role).toBe('worker');
+    expect(() => loadConfig({ ROLE: 'http' }, false)).toThrow(/ROLE must be/);
   });
 
   it('needs a real admin token in production, and a long one', () => {
