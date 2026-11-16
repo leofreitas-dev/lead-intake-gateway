@@ -34,7 +34,8 @@ describe('loadConfig', () => {
   it('runs HTTP and workers by default; ROLE=worker runs only the workers', () => {
     expect(loadConfig({}, false).role).toBe('all');
     expect(loadConfig({ ROLE: 'worker' }, false).role).toBe('worker');
-    expect(() => loadConfig({ ROLE: 'http' }, false)).toThrow(/ROLE must be/);
+    expect(loadConfig({ ROLE: 'http' }, false).role).toBe('http');
+    expect(() => loadConfig({ ROLE: 'web' }, false)).toThrow(/ROLE must be/);
   });
 
   it('needs a real admin token in production, and a long one', () => {

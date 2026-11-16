@@ -26,10 +26,12 @@ export interface Config {
   /** Jobs the worker runs at the same time. */
   workerConcurrency: number;
   /**
-   * What this process runs: "all" (HTTP and workers, the default) or "worker"
-   * (only the workers: an extra worker process, with no port of its own).
+   * What this process runs: "all" (HTTP and workers, the default), "worker"
+   * (only the workers: no port of its own) or "http" (only the HTTP server: no
+   * workers, so webhooks never share the CPU with jobs). Several processes
+   * share one queue through the database.
    */
-  role: 'all' | 'worker';
+  role: 'all' | 'worker' | 'http';
   gateway: GatewayConfig;
   ai: AiConfig;
   crm: CrmConfig;
@@ -135,8 +137,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, isTerminal = Bo
 
 function toRole(value: string | undefined): Config['role'] {
   if (!value || value === 'all') return 'all';
-  if (value === 'worker') return 'worker';
-  throw new Error(`ROLE must be "all" or "worker", got "${value}"`);
+  if (value === 'worker' || value === 'http') return value;
+  throw new Error(`ROLE must be "all", "worker" or "http", got "${value}"`);
 }
 
 function loadAdminConfig(env: NodeJS.ProcessEnv): AdminConfig {
