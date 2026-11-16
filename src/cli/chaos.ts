@@ -10,7 +10,6 @@
 //   - then it waits for the queue to drain and checks the result against the
 //     plan (src/chaos/plan.ts): leads lost, contacts duplicated in the CRM, ...
 // The report goes to reports/, with the command and the commit that made it.
-import { type ChildProcess, execFileSync, spawn } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -22,6 +21,7 @@ import { startEmbeddedPostgres } from '../db/embedded.ts';
 import { migrate } from '../db/migrate.ts';
 import { signatureHeader } from '../gateway/signature.ts';
 import { createLogger } from '../logger.ts';
+import { currentCommit, nodeStarter, type Proc, sleep, stopAll, waitFor } from './support.ts';
 
 const { values } = parseArgs({
   options: {
@@ -45,7 +45,6 @@ const dir = path.join(config.dataDir, 'chaos');
 const logDir = path.join(dir, 'logs');
 const reportsDir = path.resolve('reports');
 const log = createLogger({ logLevel: 'error', logPretty: false });
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const T0 = Date.now();
 const seconds = (at = Date.now()) => Math.round((at - T0) / 100) / 10;
 const timeline: { at: number; what: string }[] = [];
@@ -74,28 +73,8 @@ const SETTINGS: Record<string, string> = {
   RATE_LIMIT_BURST: '1000',
 };
 
-interface Proc { name: string; child: ChildProcess; pid: number; logFile: string; exited: Promise<number | null> }
 const procs: Proc[] = [];
-
-function startNode(name: string, script: string, env: Record<string, string>, args: string[] = []): Proc {
-  const logFile = path.join(logDir, `${name}.log`);
-  const out = fs.openSync(logFile, 'a');
-  const child = spawn(process.execPath, [script, ...args], { env: { ...process.env, ...env }, stdio: ['ignore', out, out] });
-  const exited = new Promise<number | null>((resolve) => child.on('exit', (code) => resolve(code)));
-  const proc = { name, child, pid: child.pid!, logFile, exited };
-  procs.push(proc);
-  return proc;
-}
-
-async function waitFor<T>(what: string, check: () => Promise<T | undefined | false>, timeoutMs: number, everyMs = 200): Promise<T> {
-  const deadline = Date.now() + timeoutMs;
-  for (;;) {
-    const result = await check().catch(() => undefined);
-    if (result) return result;
-    if (Date.now() > deadline) throw new Error(`timed out waiting for: ${what}`);
-    await sleep(everyMs);
-  }
-}
+const startNode = nodeStarter(logDir, procs);
 
 const crmMode = (mode: string, slowMs?: number) =>
   fetch(`${crmUrl}/_admin/mode`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ mode, slowMs }) });
@@ -263,10 +242,8 @@ try {
   const duplicated = duplicatedInCrm + mixed + strangers + spamInCrm;
   const ok = lost === 0 && duplicated === 0 && contacts === plan.groups.length && outOfDate === 0 && dead === 0 && resendsWithOtherId === 0;
 
-  const commit = execFileSync('git', ['rev-parse', '--short', 'HEAD']).toString().trim();
-  const dirty = execFileSync('git', ['status', '--porcelain', '--untracked-files=no']).toString().trim() !== '';
   const result = {
-    command, seed, commit: dirty ? `${commit} (with uncommitted changes)` : commit, ran_at: new Date(T0).toISOString(),
+    command, seed, commit: currentCommit(), ran_at: new Date(T0).toISOString(),
     machine: `${os.cpus().length} CPUs, ${os.platform()} ${os.release()}, Node ${process.version}`,
     settings: { ...SETTINGS, CRM_DOWN_SEC: downSec, CRM_429_SEC: faultSec, CRM_500_SEC: faultSec },
     plan: { webhooks: plan.sends.length, leads: plan.leads.length, resends: plan.sends.length - plan.leads.length, contacts: plan.groups.length, contacts_for_crm: expectedInCrm.length },
@@ -305,9 +282,7 @@ try {
   console.error(`\nchaos run failed: ${(err as Error).message}`);
   exitCode = 1;
 } finally {
-  for (const p of procs) if (p.child.exitCode === null && p.child.signalCode === null) p.child.kill('SIGINT');
-  await Promise.race([Promise.all(procs.map((p) => p.exited)), sleep(20_000)]);
-  for (const p of procs) if (p.child.exitCode === null && p.child.signalCode === null) p.child.kill('SIGKILL');
+  await stopAll(procs);
   await endPool(pool);
   await pg.stop();
 }
