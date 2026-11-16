@@ -31,7 +31,7 @@ if (config.admin.usingDemoToken) {
 const delivery = createDelivery({ pool: db.pool, log, crm: new HttpCrmClient({ baseUrl: config.crm.url, timeoutMs: config.crm.timeoutMs }), ...config.crm });
 // ROLE=worker: an extra worker process, sharing the queue, with no HTTP port.
 const app = config.role === 'all'
-  ? buildApp({ pool: db.pool, log, gateway: config.gateway, admin: config.admin, crmStatus: () => ({ url: config.crm.url, breaker: delivery.breaker.snapshot() }), processMetrics: true })
+  ? buildApp({ pool: db.intakePool, log, gateway: config.gateway, admin: config.admin, crmStatus: () => ({ url: config.crm.url, breaker: delivery.breaker.snapshot() }), processMetrics: true })
   : undefined;
 await app?.listen({ port: config.port, host: config.host });
 const live = config.ai.mode === 'live';

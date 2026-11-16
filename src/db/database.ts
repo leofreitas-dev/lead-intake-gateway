@@ -5,7 +5,14 @@ import type { Logger } from '../logger.ts';
 import { startEmbeddedPostgres } from './embedded.ts';
 
 export interface Database {
+  /** For the workers (the queue jobs). */
   pool: pg.Pool;
+  /**
+   * For the HTTP side only (webhooks, admin, console). A separate pool, so
+   * workers holding connections during their jobs can never make an incoming
+   * webhook wait for one (a "bulkhead"). Measured with npm run bench.
+   */
+  intakePool: pg.Pool;
   /** True when this process started its own embedded Postgres. */
   embedded: boolean;
   close(): Promise<void>;
@@ -23,8 +30,9 @@ export async function openDatabase(
 ): Promise<Database> {
   if (config.databaseUrl) {
     const pool = createPool(config.databaseUrl, log);
+    const intakePool = createPool(config.databaseUrl, log);
     log.info({ database: describeUrl(config.databaseUrl) }, 'using the Postgres from DATABASE_URL');
-    return { pool, embedded: false, close: () => endPool(pool) };
+    return { pool, intakePool, embedded: false, close: async () => void (await Promise.all([endPool(intakePool), endPool(pool)])) };
   }
 
   const server = await startEmbeddedPostgres({
@@ -34,11 +42,13 @@ export async function openDatabase(
     log,
   });
   const pool = createPool(server.url, log);
+  const intakePool = createPool(server.url, log);
   return {
     pool,
+    intakePool,
     embedded: true,
     close: async () => {
-      await endPool(pool);
+      await Promise.all([endPool(intakePool), endPool(pool)]);
       await server.stop();
     },
   };

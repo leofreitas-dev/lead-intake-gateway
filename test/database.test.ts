@@ -56,6 +56,23 @@ describe('openDatabase without DATABASE_URL', () => {
     await second.close();
   });
 
+  it('gives HTTP its own pool: workers holding every connection never block a webhook', async () => {
+    const db = await openDatabase(config(), silentLog);
+    try {
+      expect(db.intakePool).not.toBe(db.pool);
+      // The workers' pool fully taken...
+      const held = await Promise.all(Array.from({ length: 10 }, () => db.pool.connect()));
+      expect(db.pool.waitingCount).toBe(0);
+      // ...and the intake pool still answers at once.
+      const started = Date.now();
+      expect((await db.intakePool.query('select 1 as ok')).rows).toEqual([{ ok: 1 }]);
+      expect(Date.now() - started).toBeLessThan(1_000);
+      for (const c of held) c.release();
+    } finally {
+      await db.close();
+    }
+  });
+
   it('shuts down cleanly: pool first, then Postgres, with no lost-connection warning', async () => {
     const { log, lines } = capturingLog();
     const db = await openDatabase(config(), log);
