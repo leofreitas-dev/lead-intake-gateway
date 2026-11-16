@@ -16,7 +16,9 @@
     "db:migrate": "node src/cli/migrate.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "ai:record": "node src/cli/record-ai.ts"
+    "ai:record": "node src/cli/record-ai.ts",
+    "crm": "node src/cli/fake-crm.ts",
+    "crm:mode": "node src/cli/crm-mode.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.8.0",

@@ -27,7 +27,39 @@ export interface Config {
   workerConcurrency: number;
   gateway: GatewayConfig;
   ai: AiConfig;
+  crm: CrmConfig;
+  admin: AdminConfig;
 }
+
+export interface CrmConfig {
+  /** Where the CRM (the fake one, by default) answers. */
+  url: string;
+  /** A CRM call with no answer after this is a timeout (and retried). */
+  timeoutMs: number;
+  /** Our own limit on calls to the CRM, kept under the CRM's limit so we do not get 429. */
+  rateLimitPerSec: number;
+  rateLimitBurst: number;
+  /** Attempts before a delivery goes to dead-letter. */
+  maxAttempts: number;
+  /** Backoff between attempts: base × 2^(attempt-1), up to max, with full jitter. */
+  backoffBaseMs: number;
+  backoffMaxMs: number;
+  /** Failures in a row that open the circuit breaker. */
+  breakerThreshold: number;
+  /** How long the breaker stays open before one trial delivery. */
+  breakerCooldownMs: number;
+  /** Deliveries in flight at the same time. */
+  concurrency: number;
+}
+
+export interface AdminConfig {
+  /** Bearer token for the admin endpoints (GET /dead-letter, POST /replay). */
+  token: string;
+  usingDemoToken: boolean;
+}
+
+/** Published on purpose so the local demo works; refused with NODE_ENV=production. */
+export const DEMO_ADMIN_TOKEN = 'demo-only-admin-token';
 
 export interface AiConfig {
   /**
@@ -74,7 +106,30 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, isTerminal = Bo
     workerConcurrency: toPositiveInt(env.WORKER_CONCURRENCY, 4, 'WORKER_CONCURRENCY'),
     gateway: loadGatewayConfig(env),
     ai: loadAiConfig(env),
+    crm: {
+      url: env.CRM_URL || 'http://127.0.0.1:4010',
+      timeoutMs: toPositiveInt(env.CRM_TIMEOUT_MS, 3_000, 'CRM_TIMEOUT_MS'),
+      rateLimitPerSec: toPositiveInt(env.CRM_RATE_LIMIT_PER_SEC, 5, 'CRM_RATE_LIMIT_PER_SEC'),
+      rateLimitBurst: toPositiveInt(env.CRM_RATE_LIMIT_BURST, 5, 'CRM_RATE_LIMIT_BURST'),
+      maxAttempts: toPositiveInt(env.DELIVERY_MAX_ATTEMPTS, 10, 'DELIVERY_MAX_ATTEMPTS'),
+      backoffBaseMs: toPositiveInt(env.DELIVERY_BACKOFF_BASE_MS, 1_000, 'DELIVERY_BACKOFF_BASE_MS'),
+      backoffMaxMs: toPositiveInt(env.DELIVERY_BACKOFF_MAX_MS, 10 * 60_000, 'DELIVERY_BACKOFF_MAX_MS'),
+      breakerThreshold: toPositiveInt(env.CIRCUIT_FAILURE_THRESHOLD, 5, 'CIRCUIT_FAILURE_THRESHOLD'),
+      breakerCooldownMs: toPositiveInt(env.CIRCUIT_COOLDOWN_MS, 15_000, 'CIRCUIT_COOLDOWN_MS'),
+      concurrency: toPositiveInt(env.DELIVERY_CONCURRENCY, 4, 'DELIVERY_CONCURRENCY'),
+    },
+    admin: loadAdminConfig(env),
   };
+}
+
+function loadAdminConfig(env: NodeJS.ProcessEnv): AdminConfig {
+  const token = env.ADMIN_TOKEN;
+  if (token) {
+    if (token.length < 16) throw new Error('ADMIN_TOKEN must be at least 16 characters');
+    return { token, usingDemoToken: false };
+  }
+  if (env.NODE_ENV === 'production') throw new Error('ADMIN_TOKEN is required when NODE_ENV=production');
+  return { token: DEMO_ADMIN_TOKEN, usingDemoToken: true };
 }
 
 function loadAiConfig(env: NodeJS.ProcessEnv): AiConfig {

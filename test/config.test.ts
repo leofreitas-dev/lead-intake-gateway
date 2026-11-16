@@ -24,6 +24,18 @@ describe('loadConfig', () => {
     });
     expect(config.gateway.secrets.form).toBe('demo-only-secret-form');
     expect(config.ai).toEqual({ mode: 'recorded', model: 'claude-haiku-5-5', minConfidence: 0.7 });
+    expect(config.crm).toEqual({
+      url: 'http://127.0.0.1:4010', timeoutMs: 3000, rateLimitPerSec: 5, rateLimitBurst: 5, maxAttempts: 10,
+      backoffBaseMs: 1000, backoffMaxMs: 600000, breakerThreshold: 5, breakerCooldownMs: 15000, concurrency: 4,
+    });
+    expect(config.admin).toEqual({ token: 'demo-only-admin-token', usingDemoToken: true });
+  });
+
+  it('needs a real admin token in production, and a long one', () => {
+    const prod = { NODE_ENV: 'production', ...Object.fromEntries(['FORM', 'EMAIL', 'WHATSAPP', 'PORTAL'].map((s) => [`WEBHOOK_SECRET_${s}`, 'a-real-secret-0123456789'])) };
+    expect(() => loadConfig(prod, false)).toThrow(/ADMIN_TOKEN is required/);
+    expect(() => loadConfig({ ADMIN_TOKEN: 'short' }, false)).toThrow(/at least 16/);
+    expect(loadConfig({ ...prod, ADMIN_TOKEN: 'a-long-admin-token-123' }, false).admin.usingDemoToken).toBe(false);
   });
 
   it('uses the recorded AI answers unless AI_MODE=live, and live needs a key', () => {
