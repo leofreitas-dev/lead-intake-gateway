@@ -2,8 +2,45 @@ import { describe, expect, it } from 'vitest';
 import type { ModelReply } from '../src/ai/classifier.ts';
 import { amounts, buildDraftRequest, checkDraft, type Drafter, fillFirstName, firstNameOf, timeMentions, wantsDraft, writeDraft } from '../src/ai/draft.ts';
 import { loadPriceList } from '../src/ai/pricing.ts';
+import { RecordedClassifier } from '../src/ai/classifier.ts';
+import { classifyLead } from '../src/ai/classify.ts';
+import { RecordedDrafter } from '../src/ai/draft.ts';
+import { demoScript, loadFixture } from '../src/fixtures.ts';
+import { adapters } from '../src/leads/adapters.ts';
+import { normalizeLead } from '../src/leads/normalize.ts';
+import { decideRoute } from '../src/routing/rules.ts';
+import { isSource } from '../src/sources.ts';
 
 const prices = loadPriceList();
+
+describe('the recorded drafts (fixtures/ai/drafts.json)', () => {
+  it('cover every demo lead that gets a draft, and every one passes the guard', async () => {
+    const classifier = new RecordedClassifier();
+    const drafter = new RecordedDrafter();
+    const seen = new Set<string>();
+    const results: Record<string, string> = {};
+    for (const step of demoScript()) {
+      if (seen.has(step.fixture) || !isSource(step.source) || step.fixture.startsWith('broken')) continue;
+      seen.add(step.fixture);
+      const lead = normalizeLead(adapters[step.source](JSON.parse(loadFixture(step.source, step.fixture).body) as never));
+      const forAi = { source: step.source, message: lead.message, listingRef: lead.listingRef };
+      const classified = await classifyLead(classifier, prices, forAi);
+      const { route } = decideRoute(classified);
+      const c = classified.classification;
+      if (!c || !wantsDraft(route, c.intent)) {
+        results[step.fixture] = `no draft (${route})`;
+        continue;
+      }
+      const r = await writeDraft(drafter, prices, { ...forAi, route, classification: c });
+      results[step.fixture] = r.status === 'ready' ? `ready (${r.draft!.language})` : `blocked: ${r.problems.join('; ')}`;
+    }
+    expect(results).toEqual({
+      'lead-01': 'ready (en)', 'lead-02': 'no draft (manual_review)', 'lead-03': 'ready (en)', 'lead-04': 'ready (en)',
+      'lead-05': 'no draft (archive)', 'lead-06': 'no draft (general_inbox)', 'lead-07': 'ready (es)', 'lead-08': 'ready (en)',
+      'lead-09': 'ready (en)', 'lead-10': 'ready (en)', 'lead-11': 'ready (en)',
+    });
+  });
+});
 const input = {
   source: 'form',
   message: "Hi! I'm interested in the 3-bedroom on Maple Ave. Our budget is around $650k. Could we see it this Saturday?",
