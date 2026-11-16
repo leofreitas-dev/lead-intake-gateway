@@ -11,6 +11,7 @@
   "scripts": {
     "dev": "node --watch src/main.ts",
     "start": "node src/main.ts",
+    "send": "node src/cli/send.ts",
     "db:migrate": "node src/cli/migrate.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"

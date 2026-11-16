@@ -1,0 +1,11 @@
+{
+  "form_id": "contact-buy",
+  "site": "juniperlanerealty.example.test",
+  "submitted_at": "2026-11-16T10:02:00-05:00",
+  "name": "Emily Carter",
+  "email": "Emily.Carter@example.test",
+  "phone": "(212) 555-0147",
+  "listing_id": "JLR-1042",
+  "message": "Hi! I'm interested in the 3-bedroom on Maple Ave. Our budget is around $650k. Could we see it this Saturday?",
+  "consent_to_contact": true
+}
