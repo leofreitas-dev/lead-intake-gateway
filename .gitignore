@@ -2,6 +2,9 @@ node_modules/
 .env
 data/
 outbox/
+# A local n8n to try the n8n/ workflows: the program (tools/) and its data (.n8n-local/).
+tools/
+.n8n-local/
 coverage/
 *.log
 *.pid

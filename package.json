@@ -21,7 +21,8 @@
     "crm:mode": "node src/cli/crm-mode.ts",
     "replay": "node src/cli/replay.ts",
     "chaos": "node src/cli/chaos.ts",
-    "bench": "node src/cli/bench.ts"
+    "bench": "node src/cli/bench.ts",
+    "n8n": "node src/cli/n8n-local.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.8.0",
