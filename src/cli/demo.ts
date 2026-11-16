@@ -1,8 +1,11 @@
 // npm run demo: the whole pipeline so far, on a fresh database, with no setup.
 // Sends the Juniper Lane Realty webhooks through the real gateway (signed, in
-// process), lets the worker process them, and prints what happened.
+// process), lets the workers process and classify them, and prints what happened.
+// The AI answers are real ones recorded earlier (npm run ai:record): no key, no cost.
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { RecordedClassifier } from '../ai/classifier.ts';
+import { loadPriceList } from '../ai/pricing.ts';
 import { buildApp } from '../app.ts';
 import { loadConfig } from '../config.ts';
 import { createPool } from '../db/database.ts';
@@ -10,14 +13,25 @@ import { startEmbeddedPostgres } from '../db/embedded.ts';
 import { migrate } from '../db/migrate.ts';
 import { demoScript, loadFixture } from '../fixtures.ts';
 import { signatureHeader } from '../gateway/signature.ts';
+import { CLASSIFY_JOB, makeClassifyHandler } from '../leads/classify-job.ts';
 import { processLead } from '../leads/process.ts';
 import { createLogger } from '../logger.ts';
 import { drain } from '../queue/worker.ts';
+import { ROUTES, type Route } from '../routing/rules.ts';
 
 const SOURCE_LABEL: Record<string, string> = { form: 'form', email: 'email', whatsapp: 'WhatsApp', portal: 'portal' };
 const time = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
 const bold = (s: string) => (process.stdout.isTTY ? `\x1b[1m${s}\x1b[0m` : s);
 const dim = (s: string) => (process.stdout.isTTY ? `\x1b[2m${s}\x1b[0m` : s);
+const BUDGET_LABEL: Record<string, string> = {
+  not_stated: 'no budget',
+  rent_under_3k_month: '<$3k/mo',
+  rent_3k_plus_month: '$3k+/mo',
+  buy_under_500k: '<$500k',
+  buy_500k_to_1m: '$500k–1M',
+  buy_over_1m: '$1M+',
+};
+const usd = (n: number) => '$' + n.toFixed(6);
 const clip = (s: string | null, n: number) => (!s ? '' : s.length > n ? `${s.slice(0, n - 1)}…` : s).replace(/\s+/g, ' ');
 
 // The demo never touches DATABASE_URL: it always uses its own throwaway database.
@@ -27,7 +41,7 @@ const log = createLogger({ logLevel: 'error', logPretty: false });
 const dir = path.join(config.dataDir, 'demo-pg');
 await fs.rm(dir, { recursive: true, force: true });
 
-console.log(bold('Lead Intake Gateway demo') + dim('  (so far: intake, normalisation, identity)'));
+console.log(bold('Lead Intake Gateway demo') + dim('  (so far: intake, normalisation, identity, AI classification, routing)'));
 console.log(dim(`Juniper Lane Realty, a fictional agency. Fresh database in ${path.relative(process.cwd(), dir)}/.\n`));
 
 const server = await startEmbeddedPostgres({ dir, port: config.embeddedPgPort + 1, database: 'lead_intake_demo', log });
@@ -67,10 +81,14 @@ try {
   await app.close();
   console.log(`  → ${script.length} webhooks: ${accepted} new leads queued, ${duplicates} resend recognised, ${broken} broken payload kept\n`);
 
-  // 2. Worker
+  // 2. Workers
+  const prices = loadPriceList();
+  const classifier = new RecordedClassifier();
   const counts = await drain({ pool, log, kind: 'process', handler: processLead, concurrency: 4 });
-  console.log(bold('2. The worker takes each "process" job from the Postgres queue (FOR UPDATE SKIP LOCKED)'));
-  console.log(`  → ${counts.done} jobs done, ${counts.retry} retried, ${counts.dead} dead-letter\n`);
+  const classified = await drain({ pool, log, kind: CLASSIFY_JOB, handler: makeClassifyHandler({ classifier, prices }), concurrency: 4 });
+  console.log(bold('2. Workers take jobs from the Postgres queue (FOR UPDATE SKIP LOCKED)'));
+  console.log(`  → "process":  ${counts.done} jobs done, ${counts.retry} retried, ${counts.dead} dead-letter (each one queues a "classify" job)`);
+  console.log(`  → "classify": ${classified.done} jobs done, ${classified.retry} retried, ${classified.dead} dead-letter\n`);
 
   // 3. Identity
   const contacts = (await pool.query<{ id: string; display_name: string | null; leads: number; sources: string[]; emails: string[] | null; phones: string[] | null; merged: string[] | null }>(`
@@ -108,6 +126,8 @@ try {
       if (e.kind === 'lead') {
         const how = e.detail.new_contact ? 'new contact' : `matched by ${e.detail.matched_by.join(' + ')}`;
         console.log(`      ${at}  ${SOURCE_LABEL[e.detail.source].padEnd(8)}  ${how.padEnd(24)}  ${dim(`"${clip(e.message, 60)}"`)}`);
+      } else if (e.kind === 'routed') {
+        console.log(`      ${at}  ${''.padEnd(8)}  ${'routed'.padEnd(24)}  ${dim('→ ' + ROUTES[e.detail.route as Route])}`);
       } else if (e.kind === 'identifier_added') {
         console.log(`      ${at}  ${''.padEnd(8)}  ${`+ ${e.detail.kind} added`.padEnd(24)}  ${dim(e.detail.value)}`);
       } else {
@@ -125,7 +145,52 @@ try {
   if (sameName.length) {
     console.log(dim(`\n  "${sameName[0].display_name}" appears ${sameName.length} times on purpose: same name, different email and phone. A name alone never merges two people.`));
   }
-  console.log(dim('  Spam, the vendor and the Spanish lead are still plain contacts here: classifying them is the next step (AI, wave 5).'));
+
+  // 4. AI classifies, code routes
+  console.log('\n' + bold('4. The AI describes each lead; the code decides where it goes'));
+  console.log(dim(`  ${classifier.model}: real answers recorded on ${classifier.recordedOn() ?? 'an earlier run'}, replayed now.`));
+  console.log(dim('  Confidence below 0.70, a refusal or an invalid answer twice → manual review.\n'));
+  const routed = (
+    await pool.query<{
+      source: string; name: string | null; status: string; intent: string | null; urgency: string | null;
+      budget_band: string | null; language: string | null; confidence: string | null; evidence: string | null;
+      route: Route; reason: string;
+    }>(`
+      select l.source, l.name, c.status, c.intent, c.urgency, c.budget_band, c.language, c.confidence, c.evidence, r.route, r.reason
+        from leads l
+        join lead_classifications c on c.lead_id = l.id
+        join lead_routes r on r.lead_id = l.id
+        join inbox i on i.id = l.inbox_id
+       order by i.received_at, l.id`)
+  ).rows;
+  console.log(dim(`  ${'#'.padStart(2)}  ${'channel'.padEnd(8)}  ${'name'.padEnd(16)}  ${'intent'.padEnd(6)} ${'urgency'.padEnd(7)} ${'budget'.padEnd(9)} lang conf  route`));
+  for (const [n, r] of routed.entries()) {
+    const said = r.intent
+      ? `${r.intent.padEnd(6)} ${r.urgency!.padEnd(7)} ${BUDGET_LABEL[r.budget_band!].padEnd(9)} ${r.language!.padEnd(4)} ${Number(r.confidence).toFixed(2)}`
+      : 'no usable answer'.padEnd(34);
+    const name = clip(r.name ?? '(no name)', 16).padEnd(16);
+    console.log(`  ${String(n + 1).padStart(2)}  ${SOURCE_LABEL[r.source].padEnd(8)}  ${name}  ${said}  → ${bold(ROUTES[r.route])}`);
+    console.log(`      ${dim('why: ' + r.reason)}`);
+    if (r.evidence) console.log(`      ${dim('AI evidence: ' + r.evidence)}`);
+  }
+  const byRoute = new Map<Route, number>();
+  for (const r of routed) byRoute.set(r.route, (byRoute.get(r.route) ?? 0) + 1);
+  console.log(`\n  ${bold(`${routed.length} leads routed:`)} ${[...byRoute].map(([route, n]) => `${ROUTES[route]} ${n}`).join(' · ')}`);
+
+  // 5. Cost
+  const cost = (
+    await pool.query<{ calls: number; input: number; output: number; usd: string }>(
+      'select count(*)::int as calls, sum(input_tokens)::int as input, sum(output_tokens)::int as output, sum(cost_usd) as usd from ai_calls',
+    )
+  ).rows[0];
+  const price = prices.models[classifier.model];
+  console.log('\n' + bold('5. What the AI cost'));
+  console.log(
+    `  ${cost.calls} calls to ${classifier.model}: ${cost.input.toLocaleString('en-US')} input + ${cost.output.toLocaleString('en-US')} output tokens = ` +
+      bold(usd(Number(cost.usd))) + `  (${usd(Number(cost.usd) / Math.max(cost.calls, 1))} per lead on average)`,
+  );
+  console.log(dim('  That is what these answers cost when they were recorded; replaying them now costs $0.'));
+  console.log(dim(`  Price: $${price.input_usd_per_mtok.toFixed(2)} input / $${price.output_usd_per_mtok.toFixed(2)} output per million tokens (config/pricing.json, checked ${prices.checkedOn}).`));
 } finally {
   await pool.end();
   await server.stop();

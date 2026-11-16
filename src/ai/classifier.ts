@@ -104,6 +104,12 @@ export class RecordedClassifier implements Classifier {
     this.recordings = data.recordings;
   }
 
+  /** The day the first answer was recorded (YYYY-MM-DD), or null if there is none. */
+  recordedOn(): string | null {
+    const days = Object.values(this.recordings).map((r) => r.recorded_at.slice(0, 10)).sort();
+    return days[0] ?? null;
+  }
+
   async complete(request: ClassificationRequest): Promise<ModelReply> {
     const r = this.recordings[request.key];
     if (!r) return { text: null, stopReason: 'no_recording', model: this.model, inputTokens: 0, outputTokens: 0 };
