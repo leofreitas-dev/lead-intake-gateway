@@ -38,3 +38,31 @@ Each answer is found by a key made from the model, the system prompt and the lea
 message. If any of them changes, the old answer no longer matches: the lead goes to
 manual review in the demo until it is recorded again. Running `npm run ai:record`
 again only calls the API for leads with no answer yet.
+
+## Reply drafts
+
+`drafts.json` holds real reply drafts from the same model for the 8 demo leads that
+get one (buyers, sellers and renters; not the spam, the vendor or the lead sent to
+manual review): one call per lead, recorded on 2026-11-16 by the same command. The
+AI writes `{first_name}`; the code fills in the name, so the AI never sees it. Every
+draft also passes the guard in `src/ai/draft.ts` (no amount, day or time the lead did
+not mention, no claim of availability, no links, emails or phone numbers).
+
+Output of the recording run (2026-11-16), drafts part:
+
+```
+lead-01   827 in  130 out  $0.000148  passes the guard
+lead-02  no draft (manual_review)
+lead-03   807 in  140 out  $0.000151  passes the guard
+lead-04   797 in  121 out  $0.000140  passes the guard
+lead-05  no draft (archive)
+lead-06  no draft (general_inbox)
+lead-07   822 in  184 out  $0.000174  passes the guard
+lead-08   792 in  129 out  $0.000144  passes the guard
+lead-09   804 in  105 out  $0.000133  passes the guard
+lead-10   792 in  135 out  $0.000147  passes the guard
+lead-11   794 in  131 out  $0.000145  passes the guard
+
+Drafts: 8 calls to claude-haiku-5-5: 6435 input + 1075 output tokens = $0.001181
+(prices from config/pricing.json, checked 2026-11-16)
+```

@@ -1,0 +1,78 @@
+{
+  "about": "Real reply drafts from Claude for the demo leads that get one, recorded with `npm run ai:record` (one call per lead). The demo replays them: no key, no cost. Found by request key = sha256(model, draft system prompt, lead and route).",
+  "model": "claude-haiku-5-5",
+  "recordings": {
+    "e721eace3a72b55794e34fb8": {
+      "fixture": "lead-01",
+      "text": "{\"language\":\"en\",\"body\":\"Hi {first_name}, thank you for reaching out about listing JLR-1042 on Maple Ave. We understand you're looking to buy a 3-bedroom and would like to view it this Saturday. One of our agents will contact you shortly to confirm the details. Would you prefer a morning or afternoon slot? Best regards, Juniper Lane Realty\"}",
+      "stop_reason": "end_turn",
+      "model": "claude-haiku-5-5",
+      "input_tokens": 827,
+      "output_tokens": 130,
+      "recorded_at": "2026-11-16T14:27:28.708Z"
+    },
+    "cc0795f7272f0cdb625c8ccc": {
+      "fixture": "lead-03",
+      "text": "{\"language\":\"en\",\"body\":\"Hello {first_name}, thank you for reaching out to us about listing JLR-1042. We understand you would like to arrange a showing this weekend, and we have noted that you are pre-approved and ready to move quickly. One of our agents will contact you shortly to confirm the details. Could you tell us whether you prefer a morning or afternoon slot? Best regards, Juniper Lane Realty\"}",
+      "stop_reason": "end_turn",
+      "model": "claude-haiku-5-5",
+      "input_tokens": 807,
+      "output_tokens": 140,
+      "recorded_at": "2026-11-16T14:27:31.462Z"
+    },
+    "de4cdedb119872f82b38aff4": {
+      "fixture": "lead-04",
+      "text": "{\"language\":\"en\",\"body\":\"Hi {first_name}, thank you for reaching out to Juniper Lane Realty. We understand you're looking to rent a condo and need to move by December 1st. Our rentals desk will contact you shortly to discuss your options and confirm the details. Which neighborhood or city are you hoping to live in? Juniper Lane Realty\"}",
+      "stop_reason": "end_turn",
+      "model": "claude-haiku-5-5",
+      "input_tokens": 797,
+      "output_tokens": 121,
+      "recorded_at": "2026-11-16T14:27:33.619Z"
+    },
+    "d8ba72f24dd21d6a5412aaf5": {
+      "fixture": "lead-07",
+      "text": "{\"language\":\"es\",\"body\":\"Hola {first_name}, gracias por escribirnos y por su interés en alquilar un apartamento de 2 habitaciones cerca del centro. Hemos recibido su consulta sobre la referencia JLR-2210. Un agente que habla su idioma se pondrá en contacto con usted para confirmar los detalles, incluida su pregunta sobre mascotas. ¿Tiene alguna preferencia de zona o de fecha de mudanza? Saludos cordiales, Juniper Lane Realty\"}",
+      "stop_reason": "end_turn",
+      "model": "claude-haiku-5-5",
+      "input_tokens": 822,
+      "output_tokens": 184,
+      "recorded_at": "2026-11-16T14:27:35.740Z"
+    },
+    "0019cd716fa16f2c54cc446d": {
+      "fixture": "lead-08",
+      "text": "{\"language\":\"en\",\"body\":\"Hi {first_name}, thank you for reaching out to Juniper Lane Realty about selling your townhouse on Oak St. We understand you'd like to know what it could be worth today. An agent from our listing team will contact you to talk through the details and next steps. Would you prefer to be contacted by email or by phone? Best regards, Juniper Lane Realty\"}",
+      "stop_reason": "end_turn",
+      "model": "claude-haiku-5-5",
+      "input_tokens": 792,
+      "output_tokens": 129,
+      "recorded_at": "2026-11-16T14:27:37.855Z"
+    },
+    "36bc8e127c5d44cf59ecbdd5": {
+      "fixture": "lead-09",
+      "text": "{\"language\":\"en\",\"body\":\"Hi {first_name}, thanks for getting in touch about selling your townhouse. One of our agents will contact you shortly to take this forward, and they will confirm the details of the call with you. To help them prepare, could you tell us which area the townhouse is in? Juniper Lane Realty\"}",
+      "stop_reason": "end_turn",
+      "model": "claude-haiku-5-5",
+      "input_tokens": 804,
+      "output_tokens": 105,
+      "recorded_at": "2026-11-16T14:27:39.884Z"
+    },
+    "cfdffabcdfdeddf108ca9e38": {
+      "fixture": "lead-10",
+      "text": "{\"language\":\"en\",\"body\":\"Hi {first_name}, thank you for requesting a valuation for 77 Oak St. We understand you're looking to sell, and we're glad to help with that. An agent from our listing team will contact you to talk through the next steps and confirm the details. Could you tell us a little about the property, such as its size and how soon you'd like to move forward? Best regards, Juniper Lane Realty\"}",
+      "stop_reason": "end_turn",
+      "model": "claude-haiku-5-5",
+      "input_tokens": 792,
+      "output_tokens": 135,
+      "recorded_at": "2026-11-16T14:27:42.082Z"
+    },
+    "453a0af6c325f2dd99d2a43a": {
+      "fixture": "lead-11",
+      "text": "{\"language\":\"en\",\"body\":\"Hello {first_name}, thank you for reaching out to Juniper Lane Realty. We understand you are looking to buy a studio in Midtown and would like to see listings. An agent from our buyer team will contact you to go over the options and next steps. Could you tell us whether you have a preferred budget range or timing in mind? Best regards, Juniper Lane Realty\"}",
+      "stop_reason": "end_turn",
+      "model": "claude-haiku-5-5",
+      "input_tokens": 794,
+      "output_tokens": 131,
+      "recorded_at": "2026-11-16T14:27:44.441Z"
+    }
+  }
+}
