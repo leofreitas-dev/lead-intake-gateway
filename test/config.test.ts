@@ -10,7 +10,7 @@ describe('loadConfig', () => {
       host: '127.0.0.1',
       databaseUrl: undefined,
       dataDir: path.resolve('data'),
-      embeddedPgPort: 54329,
+      embeddedPgPort: 25432,
       logLevel: 'info',
       logPretty: false,
       workerConcurrency: 4,

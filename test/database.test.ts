@@ -32,7 +32,7 @@ function isAlive(pid: number): boolean {
 // Starts its own embedded Postgres (also in CI) to prove the zero-install path works.
 describe('openDatabase without DATABASE_URL', () => {
   let dataDir: string;
-  const config = () => ({ databaseUrl: undefined, dataDir, embeddedPgPort: 54332 });
+  const config = () => ({ databaseUrl: undefined, dataDir, embeddedPgPort: 25435 });
 
   beforeAll(async () => {
     dataDir = await fs.mkdtemp(path.join(os.tmpdir(), 'lead-intake-db-'));

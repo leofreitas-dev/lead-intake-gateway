@@ -13,7 +13,7 @@ declare module 'vitest' {
   }
 }
 
-export const TEST_PG_PORT = 54331;
+export const TEST_PG_PORT = 25434;
 
 let server: EmbeddedServer | undefined;
 let tempDir: string | undefined;

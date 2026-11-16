@@ -13,7 +13,12 @@ export interface Config {
   databaseUrl: string | undefined;
   /** Where the embedded Postgres keeps its files. */
   dataDir: string;
-  /** Port of the embedded Postgres. Only used when `databaseUrl` is empty. */
+  /**
+   * Port of the embedded Postgres. Only used when `databaseUrl` is empty.
+   * Below 32768 on purpose: ports above it are handed out by the OS as the
+   * source port of outgoing connections, and one of those can take the port
+   * just before Postgres starts ("Address already in use").
+   */
   embeddedPgPort: number;
   logLevel: string;
   /** Human-friendly log lines instead of JSON. */
@@ -62,7 +67,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, isTerminal = Bo
     host: env.HOST || '127.0.0.1',
     databaseUrl: env.DATABASE_URL || undefined,
     dataDir: path.resolve(env.DATA_DIR || 'data'),
-    embeddedPgPort: toPort(env.EMBEDDED_PG_PORT, 54329, 'EMBEDDED_PG_PORT'),
+    embeddedPgPort: toPort(env.EMBEDDED_PG_PORT, 25432, 'EMBEDDED_PG_PORT'),
     logLevel: env.LOG_LEVEL || 'info',
     // Pretty in a terminal, JSON when piped to a file or a log tool. LOG_PRETTY overrides.
     logPretty: env.LOG_PRETTY ? env.LOG_PRETTY === '1' || env.LOG_PRETTY === 'true' : isTerminal,

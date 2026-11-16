@@ -30,7 +30,7 @@ describe.skipIf(process.platform === 'win32')('Ctrl+C on a running gateway', () 
         DATABASE_URL: '',
         DATA_DIR: dataDir,
         PORT: String(port),
-        EMBEDDED_PG_PORT: '54333',
+        EMBEDDED_PG_PORT: '25436',
         LOG_PRETTY: '0',
         LOG_LEVEL: 'info',
         AI_MODE: 'recorded',
