@@ -18,10 +18,12 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^1.8.0",
     "fastify": "^5.12.8",
     "libphonenumber-js": "^1.13.16",
     "pg": "^8.23.1",
-    "pino": "^10.4.0"
+    "pino": "^10.4.0",
+    "zod": "^4.6.7"
   },
   "optionalDependencies": {
     "@embedded-postgres/darwin-arm64": "18.6.0-beta.19",

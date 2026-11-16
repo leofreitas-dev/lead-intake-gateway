@@ -1,0 +1,11 @@
+{
+  "_source": "https://platform.claude.com/docs/en/about-claude/pricing (Model pricing table, row \"Claude Haiku 5.5 (for prompts up to 100,000 tokens)\")",
+  "_checked_on": "2026-11-16",
+  "_note": "USD per million tokens, standard (global) routing, no batch discount. Classification prompts are a few hundred tokens, far below the 100,000-token threshold where Haiku 5.5 costs more. Thinking tokens, if any, are billed as output tokens and are included in usage.output_tokens.",
+  "models": {
+    "claude-haiku-5-5": {
+      "input_usd_per_mtok": 0.10,
+      "output_usd_per_mtok": 0.50
+    }
+  }
+}
