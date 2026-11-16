@@ -1,14 +1,14 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { buildApp, type App } from '../src/app.ts';
 import { createPool } from '../src/db/database.ts';
-import { createTestDatabase, silentLog, type TestDatabase } from './helpers.ts';
+import { createTestDatabase, silentLog, testGatewayConfig, type TestDatabase } from './helpers.ts';
 
 describe('health and readiness', () => {
   let db: TestDatabase;
   let app: App;
   beforeAll(async () => {
     db = await createTestDatabase();
-    app = buildApp({ pool: db.pool, log: silentLog });
+    app = buildApp({ pool: db.pool, log: silentLog, gateway: testGatewayConfig() });
   });
   afterAll(async () => {
     await app.close();
@@ -30,7 +30,7 @@ describe('health and readiness', () => {
   it('/ready answers 503 quickly when the database is down', async () => {
     // Nothing listens on port 1, so every connection attempt fails.
     const deadPool = createPool('postgres://postgres:x@127.0.0.1:1/none', silentLog);
-    const deadApp = buildApp({ pool: deadPool, log: silentLog });
+    const deadApp = buildApp({ pool: deadPool, log: silentLog, gateway: testGatewayConfig() });
     try {
       const started = Date.now();
       const res = await deadApp.inject({ method: 'GET', url: '/ready' });

@@ -1,11 +1,16 @@
 import { randomUUID } from 'node:crypto';
 import Fastify from 'fastify';
 import type pg from 'pg';
+import type { GatewayConfig } from './config.ts';
+import { webhookRoutes } from './gateway/routes.ts';
 import type { Logger } from './logger.ts';
 
 export interface AppDeps {
   pool: pg.Pool;
   log: Logger;
+  gateway: GatewayConfig;
+  /** Clock for signature and rate-limit checks. Injected in tests. */
+  now?: () => number;
 }
 
 const TRACE_HEADER = 'x-request-id';
@@ -14,7 +19,7 @@ const SAFE_TRACE_ID = /^[A-Za-z0-9._:-]{1,100}$/;
 
 export type App = ReturnType<typeof buildApp>;
 
-export function buildApp({ pool, log }: AppDeps) {
+export function buildApp({ pool, log, gateway, now }: AppDeps) {
   const app = Fastify({
     loggerInstance: log,
     // Keep the caller's trace id if it sends a sane one, so one id follows the
@@ -45,6 +50,8 @@ export function buildApp({ pool, log }: AppDeps) {
       return reply.code(503).send({ status: 'not_ready', db: 'down' });
     }
   });
+
+  app.register(webhookRoutes, { pool, config: gateway, now });
 
   return app;
 }

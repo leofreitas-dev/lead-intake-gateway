@@ -13,7 +13,10 @@ const db = await openDatabase(config, log);
 const applied = await migrate(db.pool);
 log.info({ applied }, applied.length ? 'database migrations applied' : 'database is up to date');
 
-const app = buildApp({ pool: db.pool, log });
+if (config.gateway.usingDemoSecrets) {
+  log.warn('using the built-in DEMO webhook secrets; set WEBHOOK_SECRET_<SOURCE> before real use');
+}
+const app = buildApp({ pool: db.pool, log, gateway: config.gateway });
 await app.listen({ port: config.port, host: config.host });
 log.info(`ready: http://${config.host === '0.0.0.0' ? 'localhost' : config.host}:${config.port}/ready`);
 

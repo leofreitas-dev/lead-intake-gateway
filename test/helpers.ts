@@ -1,5 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import pg from 'pg';
+import type { GatewayConfig } from '../src/config.ts';
 import { inject } from 'vitest';
 import { createPool } from '../src/db/database.ts';
 import { createLogger } from '../src/logger.ts';
@@ -35,5 +36,23 @@ export async function createTestDatabase(): Promise<TestDatabase> {
       await client.query(`drop database if exists ${name} with (force)`);
       await client.end();
     },
+  };
+}
+
+/** Gateway settings for tests: known secrets, a 5-minute window, a rate limit too high to get in the way. */
+export function testGatewayConfig(overrides: Partial<GatewayConfig> = {}): GatewayConfig {
+  return {
+    secrets: {
+      form: 'test-secret-form-0123456789',
+      email: 'test-secret-email-0123456789',
+      whatsapp: 'test-secret-whatsapp-0123456789',
+      portal: 'test-secret-portal-0123456789',
+    },
+    usingDemoSecrets: false,
+    signatureToleranceSec: 300,
+    rateLimitPerSec: 1000,
+    rateLimitBurst: 1000,
+    bodyLimitBytes: 64 * 1024,
+    ...overrides,
   };
 }
