@@ -66,6 +66,18 @@ export function createDelivery(opts: DeliveryOptions): LeasedWorkerOptions & { b
   };
 
   const external: ExternalJobHandler = async (job, jobLog) => {
+    // In half-open, the gate lets exactly one loop through: this job is the trial.
+    const isTrial = breaker.current === 'half_open';
+    try {
+      await deliver(job, jobLog);
+    } finally {
+      // If the trial ended with no verdict (429, an error before the call),
+      // free the trial slot; after success() or failure() this changes nothing.
+      if (isTrial) breaker.releaseTrial();
+    }
+  };
+
+  const deliver: ExternalJobHandler = async (job, jobLog) => {
     let contactId = await currentContact(pool, String(job.payload.contact_id));
     let contact = await crmSnapshot(pool, contactId);
     let { result, waited } = await send(contact, job.trace_id);

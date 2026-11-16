@@ -149,6 +149,20 @@ describe('delivery to the CRM', () => {
     expect((await crmState()).activeContacts).toBe(1);
   });
 
+  it('a trial delivery that gets 429 does not leave the breaker stuck half-open', async () => {
+    await leadsArrive(['whatsapp', 'lead-04'], ['email', 'lead-06']);
+    await setMode('500');
+    const d = delivery({ breakerThreshold: 1 });
+    await runOneLeasedJob(d);
+    expect(d.breaker.current).toBe('open');
+    await new Promise((r) => setTimeout(r, 200));
+    await setMode('429');
+    expect(d.breaker.waitMs()).toBe(0); // this loop makes the trial
+    expect(await runOneLeasedJob(d)).toBe('retry'); // 429: no verdict on the CRM's health
+    expect(d.breaker.current).toBe('half_open');
+    expect(d.breaker.waitMs()).toBe(0); // the next loop may try (it used to wait forever)
+  });
+
   it('429: waits for Retry-After, without counting against the breaker', async () => {
     await leadsArrive(['whatsapp', 'lead-04']);
     await setMode('429');

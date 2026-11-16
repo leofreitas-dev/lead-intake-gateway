@@ -76,6 +76,16 @@ export class CircuitBreaker implements Gate {
     if (this.state === 'half_open') this.trialInFlight = false;
   }
 
+  /**
+   * The trial delivery ended without saying whether the destination is well:
+   * a 429 (the CRM is up, just busy), or an error before the call was made.
+   * The breaker stays half-open and the next loop may make the trial.
+   * Without this, the breaker would wait for that trial's verdict forever.
+   */
+  releaseTrial(): void {
+    if (this.state === 'half_open') this.trialInFlight = false;
+  }
+
   success(): void {
     this.failures = 0;
     this.trialInFlight = false;

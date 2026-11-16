@@ -73,6 +73,17 @@ describe('CircuitBreaker', () => {
     expect(breaker.waitMs()).toBe(15_000);
   });
 
+  it('a trial that ends with no verdict (e.g. 429) frees the trial slot; the breaker stays half-open', () => {
+    const { breaker, c } = make();
+    for (let i = 0; i < 5; i++) breaker.failure('x');
+    c.advance(15_000);
+    expect(breaker.waitMs()).toBe(0);
+    expect(breaker.waitMs()).toBeGreaterThan(0);
+    breaker.releaseTrial();
+    expect(breaker.current).toBe('half_open');
+    expect(breaker.waitMs()).toBe(0);
+  });
+
   it('if the trial loop finds no job, the trial slot is freed for the next loop', () => {
     const { breaker, c } = make();
     for (let i = 0; i < 5; i++) breaker.failure('x');
