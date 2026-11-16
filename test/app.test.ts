@@ -54,4 +54,11 @@ describe('health and readiness', () => {
     const res = await app.inject({ method: 'GET', url: '/health', headers: { 'x-request-id': 'trace-from-n8n-42' } });
     expect(res.headers['x-request-id']).toBe('trace-from-n8n-42');
   });
+
+  it('replaces a trace id with odd characters or an absurd length', async () => {
+    for (const bad of ['has spaces', 'x'.repeat(101), '<script>']) {
+      const res = await app.inject({ method: 'GET', url: '/health', headers: { 'x-request-id': bad } });
+      expect(res.headers['x-request-id']).toMatch(/^[0-9a-f-]{36}$/);
+    }
+  });
 });

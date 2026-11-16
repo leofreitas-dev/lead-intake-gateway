@@ -10,16 +10,21 @@ export interface AppDeps {
 
 const TRACE_HEADER = 'x-request-id';
 const READY_TIMEOUT_MS = 2_000;
+const SAFE_TRACE_ID = /^[A-Za-z0-9._:-]{1,100}$/;
 
 export type App = ReturnType<typeof buildApp>;
 
 export function buildApp({ pool, log }: AppDeps) {
   const app = Fastify({
     loggerInstance: log,
-    // Keep the caller's trace id if it sends one, so one id follows the request
-    // across systems; otherwise start a new one.
-    requestIdHeader: TRACE_HEADER,
-    genReqId: () => randomUUID(),
+    // Keep the caller's trace id if it sends a sane one, so one id follows the
+    // request across systems; otherwise start a new one. The id ends up in logs
+    // and in the database, so odd characters or huge values are not trusted.
+    requestIdHeader: false,
+    genReqId: (req) => {
+      const sent = req.headers[TRACE_HEADER];
+      return typeof sent === 'string' && SAFE_TRACE_ID.test(sent) ? sent : randomUUID();
+    },
   });
 
   app.addHook('onSend', async (request, reply) => {
