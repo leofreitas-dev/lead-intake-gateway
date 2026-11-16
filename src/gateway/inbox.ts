@@ -1,4 +1,5 @@
 import type pg from 'pg';
+import { checkout } from '../db/database.ts';
 import type { Source } from '../sources.ts';
 import type { IdempotencyKey } from './idempotency.ts';
 
@@ -29,8 +30,7 @@ export const PROCESS_JOB = 'process';
  * nothing and returns the row that is already there.
  */
 export async function storeWebhook(pool: pg.Pool, webhook: IncomingWebhook): Promise<StoredWebhook> {
-  const client = await pool.connect();
-  let broken = false;
+  const { client, release } = await checkout(pool);
   try {
     await client.query('begin');
     // If an identical webhook is being stored by another request right now,
@@ -74,12 +74,10 @@ export async function storeWebhook(pool: pg.Pool, webhook: IncomingWebhook): Pro
     await client.query('commit');
     return result;
   } catch (err) {
-    await client.query('rollback').catch(() => {
-      broken = true; // the connection itself failed: do not give it back to the pool
-    });
+    await client.query('rollback').catch(() => {});
     throw err;
   } finally {
-    client.release(broken);
+    release();
   }
 }
 

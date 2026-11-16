@@ -67,3 +67,25 @@ export function describeUrl(connectionString: string): string {
     return '(unparseable DATABASE_URL)';
   }
 }
+
+/**
+ * Takes a connection from the pool for a transaction. If the connection breaks
+ * while it is checked out (Postgres restarted, network cut), the error is caught
+ * here instead of crashing the process, and the broken connection is thrown away
+ * instead of going back to the pool.
+ */
+export async function checkout(pool: pg.Pool): Promise<{ client: pg.PoolClient; release(): void }> {
+  const client = await pool.connect();
+  let broken: Error | undefined;
+  const onError = (err: Error) => {
+    broken = err;
+  };
+  client.on('error', onError);
+  return {
+    client,
+    release: () => {
+      client.off('error', onError);
+      client.release(broken ?? false);
+    },
+  };
+}
