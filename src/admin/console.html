@@ -206,6 +206,7 @@ td.r, th.r { text-align: right; }
 <script>
 'use strict';
 const DEMO_TOKEN = "__DEMO_TOKEN__";
+const BUDGET_LABELS = "__BUDGET_LABELS__"; // from src/ai/schema.ts, the same labels as npm run demo
 const $ = (id) => document.getElementById(id);
 // Every value from the server is put in as text, never as HTML: lead messages are written by the public.
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -341,7 +342,7 @@ function renderDetail() {
           <dl>
             <dt>Intent</dt><dd>${esc(u.intent)}</dd>
             <dt>Urgency</dt><dd>${esc(u.urgency)}</dd>
-            <dt>Budget</dt><dd>${esc((u.budget_band || '').replaceAll('_', ' '))}</dd>
+            <dt>Budget</dt><dd>${esc(BUDGET_LABELS[u.budget_band] ?? u.budget_band ?? '—')}</dd>
             <dt>Language</dt><dd>${esc(LANG(u.language))}</dd>
             <dt>Confidence</dt><dd><span class="meter"><span class="track"><span class="fill" style="width:${confidence}%"></span></span><span class="num">${confidence}%</span></span></dd>
             <dt>Evidence</dt><dd class="ink2">${esc(u.evidence)}</dd>

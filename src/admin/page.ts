@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { BUDGET_LABELS } from '../ai/schema.ts';
 import { DEMO_ADMIN_TOKEN } from '../config.ts';
 
 const TEMPLATE = fs.readFileSync(new URL('./console.html', import.meta.url), 'utf8');
@@ -10,5 +11,6 @@ const TEMPLATE = fs.readFileSync(new URL('./console.html', import.meta.url), 'ut
  */
 export function consolePage(usingDemoToken: boolean): string {
   // With the published demo token, the page offers it (and says it is for the demo only).
-  return TEMPLATE.replace('"__DEMO_TOKEN__"', usingDemoToken ? JSON.stringify(DEMO_ADMIN_TOKEN) : 'null');
+  return TEMPLATE.replace('"__DEMO_TOKEN__"', usingDemoToken ? JSON.stringify(DEMO_ADMIN_TOKEN) : 'null')
+    .replace('"__BUDGET_LABELS__"', JSON.stringify(BUDGET_LABELS));
 }

@@ -15,6 +15,16 @@ export const BUDGET_BANDS = [
   'buy_over_1m',
 ] as const;
 
+/** How a budget band is shown to people (the demo and the console). */
+export const BUDGET_LABELS: Record<(typeof BUDGET_BANDS)[number], string> = {
+  not_stated: 'no budget',
+  rent_under_3k_month: '<$3k/mo',
+  rent_3k_plus_month: '$3k+/mo',
+  buy_under_500k: '<$500k',
+  buy_500k_to_1m: '$500k–1M',
+  buy_over_1m: '$1M+',
+};
+
 export const Classification = z
   .object({
     intent: z.enum(INTENTS),

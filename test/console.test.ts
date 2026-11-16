@@ -96,6 +96,9 @@ describe('the approval console: page and /api routes', () => {
       expect(res.body).toContain('Approvals');
       expect(res.body).toContain('Dashboard');
       expect(res.body).toContain('const DEMO_TOKEN = null;');
+      // Budgets read like in npm run demo ("$500k–1M"), from the same labels.
+      expect(res.body).toContain('"buy_500k_to_1m":"$500k–1M"');
+      expect(res.body).not.toContain('__BUDGET_LABELS__');
     });
 
     it('offers the demo token, with a warning, only when the demo token is in use', async () => {

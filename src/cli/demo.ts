@@ -6,6 +6,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { RecordedClassifier } from '../ai/classifier.ts';
 import { RecordedDrafter } from '../ai/draft.ts';
+import { BUDGET_LABELS } from '../ai/schema.ts';
 import { DRAFT_JOB, makeDraftHandler } from '../replies/draft-job.ts';
 import { loadPriceList } from '../ai/pricing.ts';
 import { buildApp } from '../app.ts';
@@ -25,14 +26,7 @@ const SOURCE_LABEL: Record<string, string> = { form: 'form', email: 'email', wha
 const time = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
 const bold = (s: string) => (process.stdout.isTTY ? `\x1b[1m${s}\x1b[0m` : s);
 const dim = (s: string) => (process.stdout.isTTY ? `\x1b[2m${s}\x1b[0m` : s);
-const BUDGET_LABEL: Record<string, string> = {
-  not_stated: 'no budget',
-  rent_under_3k_month: '<$3k/mo',
-  rent_3k_plus_month: '$3k+/mo',
-  buy_under_500k: '<$500k',
-  buy_500k_to_1m: '$500k–1M',
-  buy_over_1m: '$1M+',
-};
+const BUDGET_LABEL: Record<string, string> = BUDGET_LABELS;
 const usd = (n: number) => '$' + n.toFixed(6);
 const clip = (s: string | null, n: number) => (!s ? '' : s.length > n ? `${s.slice(0, n - 1)}…` : s).replace(/\s+/g, ' ');
 
