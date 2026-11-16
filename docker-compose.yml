@@ -1,0 +1,22 @@
+# Optional: a regular Postgres 18 for people who already use Docker.
+# Start it with `docker compose up -d`, then set in .env:
+#   DATABASE_URL=postgres://postgres:postgres@localhost:5432/lead_intake
+# Without Docker, skip this file: `npm run dev` starts an embedded Postgres by itself.
+services:
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: lead_intake
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 2s
+      timeout: 5s
+      retries: 15
+
+volumes:
+  pgdata:
