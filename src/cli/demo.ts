@@ -5,6 +5,8 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { RecordedClassifier } from '../ai/classifier.ts';
+import { RecordedDrafter } from '../ai/draft.ts';
+import { DRAFT_JOB, makeDraftHandler } from '../replies/draft-job.ts';
 import { loadPriceList } from '../ai/pricing.ts';
 import { buildApp } from '../app.ts';
 import { loadConfig } from '../config.ts';
@@ -92,7 +94,10 @@ try {
   const classified = await drain({ pool, log, kind: CLASSIFY_JOB, handler: makeClassifyHandler({ classifier, prices }), concurrency: 4 });
   console.log(bold('2. Workers take jobs from the Postgres queue (FOR UPDATE SKIP LOCKED)'));
   console.log(`  → "process":  ${counts.done} jobs done, ${counts.retry} retried, ${counts.dead} dead-letter (each one queues a "classify" job)`);
-  console.log(`  → "classify": ${classified.done} jobs done, ${classified.retry} retried, ${classified.dead} dead-letter\n`);
+  console.log(`  → "classify": ${classified.done} jobs done, ${classified.retry} retried, ${classified.dead} dead-letter (buyers, sellers and renters get a "draft_reply" job)`);
+  const drafter = new RecordedDrafter();
+  const drafted = await drain({ pool, log, kind: DRAFT_JOB, handler: makeDraftHandler({ drafter, prices }), concurrency: 4 });
+  console.log(`  → "draft_reply": ${drafted.done} jobs done, ${drafted.retry} retried, ${drafted.dead} dead-letter\n`);
 
   // 3. Identity
   const contacts = (await pool.query<{ id: string; display_name: string | null; leads: number; sources: string[]; emails: string[] | null; phones: string[] | null; merged: string[] | null }>(`
@@ -181,18 +186,35 @@ try {
   for (const r of routed) byRoute.set(r.route, (byRoute.get(r.route) ?? 0) + 1);
   console.log(`\n  ${bold(`${routed.length} leads routed:`)} ${[...byRoute].map(([route, n]) => `${ROUTES[route]} ${n}`).join(' · ')}`);
 
-  // 5. Cost
-  const cost = (
-    await pool.query<{ calls: number; input: number; output: number; usd: string }>(
-      'select count(*)::int as calls, sum(input_tokens)::int as input, sum(output_tokens)::int as output, sum(cost_usd) as usd from ai_calls',
+  // 5. Reply drafts
+  console.log('\n' + bold('5. The AI drafts a reply; a person approves it'));
+  console.log(dim('  Only buyers, sellers and renters. Code checks each draft: no price, day, time or availability the lead did not mention.\n'));
+  const replies = (await pool.query<{ id: string; name: string | null; status: string; language: string; ai_body: string | null }>(
+    `select d.id::text, l.name, d.status, d.language, d.ai_body from reply_drafts d join leads l on l.id = d.lead_id order by d.id`)).rows;
+  for (const r of replies) {
+    const what = r.status === 'pending' ? 'waiting for approval' : r.status === 'blocked' ? 'no safe draft: a person writes it' : r.status;
+    console.log(`  #${r.id.padEnd(3)} ${clip(r.name ?? '(no name)', 16).padEnd(16)}  ${r.language}  ${bold(what)}`);
+    if (r.ai_body && r.status === 'pending') console.log(`       ${dim(`"${clip(r.ai_body, 110)}"`)}`);
+  }
+  console.log(dim(`\n  Approve, edit or reject them in the console: npm start, then http://127.0.0.1:3000 (approved replies go to outbox/, never sent).`));
+
+  // 6. Cost
+  const costs = (
+    await pool.query<{ purpose: string; calls: number; input: number; output: number; usd: string }>(
+      `select purpose, count(*)::int as calls, sum(input_tokens)::int as input, sum(output_tokens)::int as output, sum(cost_usd) as usd
+         from ai_calls group by purpose order by purpose`,
     )
-  ).rows[0];
+  ).rows;
   const price = prices.models[classifier.model];
-  console.log('\n' + bold('5. What the AI cost'));
-  console.log(
-    `  ${cost.calls} calls to ${classifier.model}: ${cost.input.toLocaleString('en-US')} input + ${cost.output.toLocaleString('en-US')} output tokens = ` +
-      bold(usd(Number(cost.usd))) + `  (${usd(Number(cost.usd) / Math.max(cost.calls, 1))} per lead on average)`,
-  );
+  console.log('\n' + bold('6. What the AI cost'));
+  for (const cost of costs) {
+    console.log(
+      `  ${(cost.purpose === 'draft' ? 'reply drafts' : 'classification').padEnd(14)}  ${cost.calls} calls to ${classifier.model}: ${cost.input.toLocaleString('en-US')} input + ${cost.output.toLocaleString('en-US')} output tokens = ` +
+        bold(usd(Number(cost.usd))),
+    );
+  }
+  const total = costs.reduce((n, c) => n + Number(c.usd), 0);
+  console.log(`  ${'total'.padEnd(14)}  ${bold(usd(total))}  (${usd(total / Math.max(routed.length, 1))} per lead on average)`);
   console.log(dim('  That is what these answers cost when they were recorded; replaying them now costs $0.'));
   console.log(dim(`  Price: $${price.input_usd_per_mtok.toFixed(2)} input / $${price.output_usd_per_mtok.toFixed(2)} output per million tokens (config/pricing.json, checked ${prices.checkedOn}).`));
 } finally {

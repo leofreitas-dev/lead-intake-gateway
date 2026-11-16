@@ -9,6 +9,8 @@ import { HttpCrmClient } from './crm/http-crm.ts';
 import { createDelivery } from './delivery/deliver-job.ts';
 import { CLASSIFY_JOB, makeClassifyHandler } from './leads/classify-job.ts';
 import { processLead } from './leads/process.ts';
+import { AnthropicDrafter, RecordedDrafter } from './ai/draft.ts';
+import { DRAFT_JOB, makeDraftHandler } from './replies/draft-job.ts';
 import { createLogger } from './logger.ts';
 import { startWorker, WORKER_ID } from './queue/worker.ts';
 
@@ -26,25 +28,36 @@ if (config.gateway.usingDemoSecrets) {
 if (config.admin.usingDemoToken) {
   log.warn('using the built-in DEMO admin token for /dead-letter and /replay; set ADMIN_TOKEN before real use');
 }
+const delivery = createDelivery({ pool: db.pool, log, crm: new HttpCrmClient({ baseUrl: config.crm.url, timeoutMs: config.crm.timeoutMs }), ...config.crm });
 // ROLE=worker: an extra worker process, sharing the queue, with no HTTP port.
-const app = config.role === 'all' ? buildApp({ pool: db.pool, log, gateway: config.gateway, admin: config.admin }) : undefined;
+const app = config.role === 'all'
+  ? buildApp({ pool: db.pool, log, gateway: config.gateway, admin: config.admin, crmStatus: () => ({ url: config.crm.url, breaker: delivery.breaker.snapshot() }) })
+  : undefined;
 await app?.listen({ port: config.port, host: config.host });
-const classifier = config.ai.mode === 'live' ? new AnthropicClassifier(config.ai.model) : new RecordedClassifier();
+const live = config.ai.mode === 'live';
+const classifier = live ? new AnthropicClassifier(config.ai.model) : new RecordedClassifier();
+const drafter = live ? new AnthropicDrafter(config.ai.model) : new RecordedDrafter();
 log.info(
   { ai_mode: classifier.mode, model: classifier.model },
-  classifier.mode === 'live' ? 'AI: calling the Anthropic API (costs money)' : 'AI: replaying recorded answers (no key, no cost); set AI_MODE=live to call the API',
+  live ? 'AI: calling the Anthropic API (costs money)' : 'AI: replaying recorded answers (no key, no cost); set AI_MODE=live to call the API',
 );
-const classify = makeClassifyHandler({ classifier, prices: loadPriceList(), minConfidence: config.ai.minConfidence });
+const prices = loadPriceList();
+const classify = makeClassifyHandler({ classifier, prices, minConfidence: config.ai.minConfidence });
 const workers = [
   startWorker({ pool: db.pool, log, kind: 'process', handler: processLead, concurrency: config.workerConcurrency }),
   startWorker({ pool: db.pool, log, kind: CLASSIFY_JOB, handler: classify, concurrency: config.workerConcurrency }),
-  startWorker(createDelivery({ pool: db.pool, log, crm: new HttpCrmClient({ baseUrl: config.crm.url, timeoutMs: config.crm.timeoutMs }), ...config.crm })),
+  startWorker({ pool: db.pool, log, kind: DRAFT_JOB, handler: makeDraftHandler({ drafter, prices }), concurrency: config.workerConcurrency }),
+  startWorker(delivery),
 ];
 log.info(
   { crm: config.crm.url, max_attempts: config.crm.maxAttempts, rate_limit_per_sec: config.crm.rateLimitPerSec, breaker_threshold: config.crm.breakerThreshold },
   `CRM deliveries go to ${config.crm.url} (start the fake one with: npm run crm)`,
 );
-if (app) log.info(`ready: http://${config.host === '0.0.0.0' ? 'localhost' : config.host}:${config.port}/ready`);
+if (app) {
+  const base = `http://${config.host === '0.0.0.0' ? 'localhost' : config.host}:${config.port}`;
+  log.info(`ready: ${base}/ready`);
+  log.info(`approval console: ${base}/  (replies approved there go to ${config.admin.outboxDir}, never sent)`);
+}
 else log.info(`ready: worker-only process ${WORKER_ID}, no HTTP port`);
 
 // Stop taking requests and let the ones in flight finish; let the workers finish
