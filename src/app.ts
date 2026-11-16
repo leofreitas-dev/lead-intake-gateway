@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import Fastify from 'fastify';
 import type pg from 'pg';
-import type { GatewayConfig } from './config.ts';
+import { adminRoutes } from './admin/routes.ts';
+import type { AdminConfig, GatewayConfig } from './config.ts';
 import { webhookRoutes } from './gateway/routes.ts';
 import type { Logger } from './logger.ts';
 
@@ -9,6 +10,8 @@ export interface AppDeps {
   pool: pg.Pool;
   log: Logger;
   gateway: GatewayConfig;
+  /** Admin endpoints (dead-letter, replay). Left out, they are not served. */
+  admin?: AdminConfig;
   /** Clock for signature and rate-limit checks. Injected in tests. */
   now?: () => number;
 }
@@ -19,7 +22,7 @@ const SAFE_TRACE_ID = /^[A-Za-z0-9._:-]{1,100}$/;
 
 export type App = ReturnType<typeof buildApp>;
 
-export function buildApp({ pool, log, gateway, now }: AppDeps) {
+export function buildApp({ pool, log, gateway, admin, now }: AppDeps) {
   const app = Fastify({
     loggerInstance: log,
     // Keep the caller's trace id if it sends a sane one, so one id follows the
@@ -52,6 +55,7 @@ export function buildApp({ pool, log, gateway, now }: AppDeps) {
   });
 
   app.register(webhookRoutes, { pool, config: gateway, now });
+  if (admin) app.register(adminRoutes, { pool, admin });
 
   return app;
 }

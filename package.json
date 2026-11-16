@@ -18,7 +18,8 @@
     "test": "vitest run",
     "ai:record": "node src/cli/record-ai.ts",
     "crm": "node src/cli/fake-crm.ts",
-    "crm:mode": "node src/cli/crm-mode.ts"
+    "crm:mode": "node src/cli/crm-mode.ts",
+    "replay": "node src/cli/replay.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.8.0",
