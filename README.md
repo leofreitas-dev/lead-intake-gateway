@@ -2,7 +2,7 @@
 
 Leads arrive from a website form, email, WhatsApp and a listings portal. Providers resend webhooks, the same person writes on three channels, and the CRM is sometimes down. This gateway stores every lead before it answers, merges duplicates, and delivers each contact to the CRM once, even through outages.
 
-<!-- VIDEO -->
+https://github.com/user-attachments/assets/079af3ce-0172-4515-885e-9e6fe1fefcf4
 
 [![CI](https://github.com/leofreitas-dev/lead-intake-gateway/actions/workflows/ci.yml/badge.svg)](https://github.com/leofreitas-dev/lead-intake-gateway/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![Node 24 + TypeScript](https://img.shields.io/badge/node%2024-TypeScript-informational.svg)](https://nodejs.org)
 
