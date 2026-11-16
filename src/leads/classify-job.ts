@@ -1,6 +1,7 @@
 import type { Classifier } from '../ai/classifier.ts';
 import { classifyLead, MIN_CONFIDENCE } from '../ai/classify.ts';
 import type { PriceList } from '../ai/pricing.ts';
+import { DELIVER_JOB, NOT_DELIVERED_ROUTES } from '../delivery/deliver-job.ts';
 import type { JobHandler } from '../queue/worker.ts';
 import { decideRoute, ROUTES } from '../routing/rules.ts';
 
@@ -66,6 +67,14 @@ export function makeClassifyHandler({ classifier, prices, minConfidence = MIN_CO
        select contact_id, 'routed', id, $2, occurred_at from leads where id = $1 for update`,
       [leadId, { route: decision.route, rule: decision.rule, reason: decision.reason, intent: c?.intent ?? null }],
     );
+    // Next step, in the same transaction: deliver the contact to the CRM (spam never goes).
+    if (!NOT_DELIVERED_ROUTES.has(decision.route)) {
+      await client.query(
+        `insert into jobs (kind, inbox_id, payload, trace_id)
+         select $2, inbox_id, jsonb_build_object('contact_id', contact_id, 'lead_id', id), trace_id from leads where id = $1`,
+        [leadId, DELIVER_JOB],
+      );
+    }
 
     log.info(
       { lead_id: leadId, status: result.status, intent: c?.intent, urgency: c?.urgency, confidence: c?.confidence, route: decision.route,
