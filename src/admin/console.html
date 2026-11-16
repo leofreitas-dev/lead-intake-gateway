@@ -211,6 +211,7 @@ const $ = (id) => document.getElementById(id);
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const usd = (n) => '$' + (n ?? 0).toFixed(n >= 1 ? 2 : 4);
 const int = (n) => (n ?? 0).toLocaleString('en-US');
+const plural = (n, word) => `${int(n)} ${word}${n === 1 ? '' : 's'}`;
 const ago = (t) => {
   if (!t) return '—';
   const s = Math.max(0, (Date.now() - new Date(t).getTime()) / 1000);
@@ -425,7 +426,7 @@ async function loadDashboard() {
   const tiles = [
     ['Leads received', int(totalLeads), `${int(d.channels.reduce((n, c) => n + c.webhooks, 0))} webhooks stored`],
     ['People', int(d.people.contacts), `${int(d.people.merges)} merged across channels`],
-    ['Duplicates caught', int(resends + d.people.merges), `${int(resends)} resent webhooks · ${int(d.people.merges)} merges`],
+    ['Duplicates caught', int(resends + d.people.merges), `${plural(resends, 'resent webhook')} · ${plural(d.people.merges, 'merge')}`],
     ['Queue', int(queued), 'jobs pending or running'],
     ['Replies', int(waiting), `waiting · ${int((d.drafts.approved || 0) + (d.drafts.edited || 0))} approved · ${int(d.drafts.rejected || 0)} rejected`],
     ['AI cost', usd(d.ai.total_usd), `${int(d.ai.rows.reduce((n, r) => n + r.calls, 0))} calls in total`],
@@ -433,6 +434,7 @@ async function loadDashboard() {
   $('tiles').innerHTML = tiles.map(([label, value, sub]) => `<div class="card tile"><div class="label">${esc(label)}</div><div class="value num">${esc(value)}</div><div class="sub">${esc(sub)}</div></div>`).join('');
 
   const max = Math.max(1, ...d.channels.map((c) => c.leads));
+  d.channels.sort((a, b) => b.leads - a.leads || a.source.localeCompare(b.source));
   $('channels').innerHTML = d.channels.length ? d.channels.map((c) => `
     <div class="lab">${esc(CHANNELS[c.source] || c.source)}</div>
     <div class="track"><div class="fill" style="width:${(c.leads / max) * 100}%" title="${esc(`${CHANNELS[c.source] || c.source}: ${c.leads} leads, ${c.resends} resends caught, ${c.rejected} unreadable`)}"></div></div>
