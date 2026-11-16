@@ -1,0 +1,85 @@
+{
+  "command": "npm run bench -- --layout split",
+  "commit": "8b94d70",
+  "ran_at": "2026-11-16T15:11:09.232Z",
+  "machine": {
+    "cpu": "AMD Ryzen 5 5500",
+    "cpus": 12,
+    "memory_gb": 15,
+    "os": "linux 6.18.58.1-microsoft-standard-WSL2 (WSL2)",
+    "node": "v24.22.2",
+    "postgres": "18.6"
+  },
+  "layout": "split",
+  "setup": "Layout \"split\": two processes on the same database: HTTP only (ROLE=http) and the workers (ROLE=worker). Logs at info to a file, AI replaying recordings, its own embedded Postgres, the fake CRM; the load generator on the same machine. Every request a new signed webhook of a fictional person.",
+  "settings": {
+    "AI_MODE": "recorded",
+    "LOG_PRETTY": "0",
+    "LOG_LEVEL": "info",
+    "RATE_LIMIT_PER_SEC": "100000",
+    "RATE_LIMIT_BURST": "100000",
+    "CRM_RATE_LIMIT_PER_SEC": "100",
+    "CRM_RATE_LIMIT_BURST": "100",
+    "warmup_seconds": 3,
+    "rate_per_second": 200,
+    "seconds": 15,
+    "connections": 32,
+    "layout": "split"
+  },
+  "steady": {
+    "target_per_second": 200,
+    "achieved_per_second": 200,
+    "requests": 3000,
+    "accepted": 3000,
+    "by_status": {
+      "202": 3000
+    },
+    "ms": {
+      "p50": 10.09,
+      "p95": 31.45,
+      "p99": 57.39,
+      "max": 102.27,
+      "mean": 12.74
+    }
+  },
+  "maximum": {
+    "connections": 32,
+    "seconds": 15.3,
+    "accepted_per_second": 364,
+    "requests": 5571,
+    "accepted": 5571,
+    "by_status": {
+      "202": 5571
+    },
+    "ms": {
+      "p50": 60.42,
+      "p95": 220.23,
+      "p99": 322.45,
+      "max": 437.99,
+      "mean": 87.33
+    }
+  },
+  "server_side": {
+    "accepted_counted": 9171,
+    "mean_ms": 55.86
+  },
+  "lost": 0,
+  "backlog_when_measured": [
+    {
+      "kind": "classify",
+      "n": 3
+    },
+    {
+      "kind": "deliver_crm",
+      "n": 2726
+    },
+    {
+      "kind": "draft_reply",
+      "n": 9
+    },
+    {
+      "kind": "process",
+      "n": 5379
+    }
+  ]
+}
