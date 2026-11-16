@@ -1,10 +1,9 @@
 // npm run send -- <source> <fixture> [options]
 // Signs a fixture with the channel's secret and posts it to the running gateway.
-import { readFileSync, existsSync } from 'node:fs';
-import path from 'node:path';
 import { parseArgs } from 'node:util';
 import { loadConfig } from '../config.ts';
 import { loadDotEnv } from '../env.ts';
+import { loadFixture } from '../fixtures.ts';
 import { signatureHeader } from '../gateway/signature.ts';
 import { isSource, SOURCES } from '../sources.ts';
 
@@ -42,12 +41,13 @@ if (!isSource(source)) exit(`Unknown source "${source}". Use one of: ${SOURCES.j
 const times = Number(values.times);
 if (!Number.isInteger(times) || times < 1 || times > 1000) exit('--times must be a whole number from 1 to 1000.');
 
-const dir = path.join('fixtures', 'webhooks', source);
-const file = ['.json', '.txt'].map((ext) => path.join(dir, fixture + ext)).find((f) => existsSync(f));
-if (!file) exit(`No fixture "${fixture}" in ${dir}/.`);
-// JSON fixtures are sent compact, like a provider would; .txt files are sent as they are.
-const raw = readFileSync(file, 'utf8');
-const body = file.endsWith('.json') ? JSON.stringify(JSON.parse(raw)) : raw.trimEnd();
+let file: string;
+let body: string;
+try {
+  ({ file, body } = loadFixture(source, fixture));
+} catch (err) {
+  exit((err as Error).message);
+}
 
 loadDotEnv();
 const config = loadConfig();

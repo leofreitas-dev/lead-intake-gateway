@@ -1,0 +1,15 @@
+[
+  { "source": "form", "fixture": "lead-01", "note": "Emily asks about a house on the website" },
+  { "source": "whatsapp", "fixture": "lead-02", "note": "Emily follows up on WhatsApp (phone written another way)" },
+  { "source": "portal", "fixture": "lead-03", "note": "Emily books a showing on the listing portal (third way)" },
+  { "source": "form", "fixture": "lead-01", "note": "the form provider resends Emily's webhook" },
+  { "source": "whatsapp", "fixture": "lead-04", "note": "Marcus: phone only, no email" },
+  { "source": "form", "fixture": "lead-05", "note": "spam from an SEO bot" },
+  { "source": "email", "fixture": "lead-06", "note": "a vendor, not a lead" },
+  { "source": "portal", "fixture": "lead-07", "note": "Sofía writes in Spanish" },
+  { "source": "form", "fixture": "lead-08", "note": "Daniel: email only" },
+  { "source": "whatsapp", "fixture": "lead-09", "note": "\"Dan B\": phone only, looks like a new person" },
+  { "source": "portal", "fixture": "lead-10", "note": "Daniel with email and phone: proves they are one person" },
+  { "source": "form", "fixture": "lead-11", "note": "another Emily Carter: same name, different person" },
+  { "source": "form", "fixture": "broken-01", "note": "a broken payload, correctly signed" }
+]

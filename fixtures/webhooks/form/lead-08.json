@@ -1,0 +1,9 @@
+{
+  "form_id": "contact-sell",
+  "site": "juniperlanerealty.example.test",
+  "submitted_at": "2026-11-16T14:00:00-05:00",
+  "name": "Daniel Brooks",
+  "email": "daniel.brooks@example.test",
+  "message": "Thinking about selling my townhouse on Oak St. What would it be worth today?",
+  "consent_to_contact": true
+}

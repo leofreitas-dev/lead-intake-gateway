@@ -1,0 +1,10 @@
+{
+  "form_id": "contact-buy",
+  "site": "juniperlanerealty.example.test",
+  "submitted_at": "2026-11-16T15:30:00-05:00",
+  "name": "Emily Carter",
+  "email": "e.carter.nyc@example.test",
+  "phone": "(646) 555-0110",
+  "message": "Cash buyer looking for a studio in Midtown. Can you send me listings?",
+  "consent_to_contact": true
+}

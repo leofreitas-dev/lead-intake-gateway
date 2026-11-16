@@ -1,0 +1,12 @@
+{
+  "event": "lead.created",
+  "created_at": "2026-11-16T13:45:00-05:00",
+  "listing": { "id": "JLR-2210", "address": "402 Bayside Ct, Unit 5" },
+  "lead": {
+    "first_name": "Sofía",
+    "last_name": "Ramírez",
+    "email": "Sofia.Ramirez@example.test",
+    "phone": "(786) 555-0163",
+    "comments": "Hola, me interesa alquilar un apartamento de 2 habitaciones cerca del centro. ¿Aceptan mascotas?"
+  }
+}
